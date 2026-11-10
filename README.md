@@ -5,7 +5,7 @@
 ## 🔗 [افتح المنصة — Open the live site](https://alisalehalqattan.github.io/wafra/)
 
 
-منصة B2B بالذكاء الاصطناعي تنقذ المحاصيل السليمة المرفوضة شكلياً: يصوّر المزارع محصوله، فيفرّق الذكاء الاصطناعي بين **العيب الشكلي** و**التلف الحقيقي**، ثم يُطرح المحصول في **مزاد تنازلي** لأقرب مصانع العصائر والحلويات والمطابخ السحابية والمطاعم، وكل صفقة تصدر لها **شهادة استدامة** توثّق الكمية المنقذة و CO₂ المتجنب.
+منصة B2B بالذكاء الاصطناعي تنقذ المحاصيل السليمة المرفوضة شكلياً: يصوّر المزارع محصوله، فيفرّق الذكاء الاصطناعي بين **العيب الشكلي** و**التلف الحقيقي**، ثم تصل **عروض المشترين** من أقرب مصانع العصائر والحلويات والمطابخ السحابية والمطاعم، ويختار المزارع العرض الأنسب، وكل صفقة تصدر لها **شهادة استدامة** توثّق الكمية المنقذة و CO₂ المتجنب.
 
 مشروع فريق **وفرة** في هاكاثون الأمن الغذائي والاستدامة البيئية.
 
@@ -14,8 +14,8 @@
 | الشاشة | الوظيفة |
 | --- | --- |
 | الرئيسية | المشكلة بالأرقام، طريقة العمل، الفئات المستهدفة، رؤية 2030 |
-| بوابة المزارع | رفع صورة ← فحص ← تحديد الكمية ← الطرح في المزاد |
-| سوق الإنقاذ | مزادات مباشرة، ترتيب حسب المسافة، أولوية للأقرب، وصفقات مكتملة بهوية مشترين محمية |
+| بوابة المزارع | رفع صورة ← فحص ← تحديد الكمية ← العرض للمشترين ← استقبال العروض لحظياً وقبول الأنسب |
+| سوق الإنقاذ | محاصيل تستقبل العروض، سعر مقترح وحد أدنى، عروض المشترين بأسماء مخفية، وصفقات مكتملة بهوية محمية |
 | شهادة الاستدامة | رقم مميز، رمز QR، تاريخ هجري وميلادي، تحميل PDF |
 | لوحة الأثر | الكميات المنقذة، CO₂ المتجنب، دخل المزارعين، توفير المشترين، الكميات حسب المحصول |
 
@@ -36,4 +36,4 @@
 
 ---
 
-**Wafra** is an Arabic-first B2B prototype: AI grades produce photos (cosmetic defect vs. real spoilage), safe "ugly" produce is sold in a declining-price auction to the nearest juice factories, sweets factories, cloud kitchens and restaurants, and every sale issues a sustainability certificate (kg rescued, CO₂e avoided). Built for a food-security & sustainability hackathon.
+**Wafra** is an Arabic-first B2B prototype: AI grades produce photos (cosmetic defect vs. real spoilage), safe "ugly" produce is offered to the nearest juice factories, sweets factories, cloud kitchens and restaurants, who send anonymous price offers; the farmer accepts the best one, and every sale issues a sustainability certificate (kg rescued, CO₂e avoided). Built for a food-security & sustainability hackathon.

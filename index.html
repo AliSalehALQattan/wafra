@@ -16,6 +16,17 @@
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
+.obox{font-size:13.5px;background:var(--bg);border-radius:10px;padding:8px 10px;color:var(--ink2)}
+.offers{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.orow{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.orow.top{border-color:var(--amber);background:#fffaf0}
+.orow .who{flex:1;min-width:0}
+.orow .amt{text-align:left;white-space:nowrap}
+.orow .amt b{font-size:18px;color:var(--green)}
+.orow .btn{padding:8px 16px;font-size:14px}
+.fl{padding:10px;display:flex;flex-direction:column;gap:8px}
+.fl .mi{border:0;padding:0;background:transparent}
+
 .btn.dlapp{padding:9px 16px;font-size:14.5px;border-radius:999px;white-space:nowrap;flex:none}
 .ic{width:1.15em;height:1.15em;vertical-align:-.2em;flex:none;display:inline-block}
 .cr{width:1.35em;height:1.35em;vertical-align:-.3em;display:inline-block;flex:none}
@@ -148,7 +159,7 @@ section.block{margin-top:46px}
 
 /* farmer */
 .two{display:grid;grid-template-columns:1.05fr .95fr;gap:22px;align-items:start}
-.drop{border:2px dashed #c9bb9c;border-radius:var(--r);padding:30px;text-align:center;background:repeating-linear-gradient(45deg,transparent 0 12px,rgba(226,216,195,.25) 12px 24px);cursor:pointer;transition:.15s}
+.drop{display:block;border:2px dashed #c9bb9c;border-radius:var(--r);padding:30px;text-align:center;background:repeating-linear-gradient(45deg,transparent 0 12px,rgba(226,216,195,.25) 12px 24px);cursor:pointer;transition:.15s}
 .drop:hover,.drop.over{border-color:var(--green2);background-color:var(--mint)}
 .samples{display:flex;gap:10px;margin-top:14px}
 .samples button{flex:1;border:1px solid var(--line);background:#fff;border-radius:12px;padding:6px;cursor:pointer}
@@ -290,10 +301,8 @@ footer .row{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;a
    وفرة — Wafra prototype
    ============================================================ */
 const CO2_PER_KG = 2.5;          // kg CO2e per kg food waste avoided (FAO 2013: 3.3 Gt CO2e / 1.3 Gt food)
-const START_RATIO = 0.60;        // auction opens at 60% of wholesale price (40% off)
-const FLOOR_RATIO = 0.40;        // auction floor 40% of wholesale (60% off) → avg ≈ 50% off
-const PRIORITY_MIN = 10;         // first minutes reserved for nearby buyers
-const PRIORITY_KM = 200;
+const SUGGEST_RATIO = 0.50;      // AI-suggested price = 50% of wholesale
+const MIN_RATIO = 0.40;          // lowest offer the platform accepts = 40% of wholesale (protects the farmer)
 
 const PRICES = { // illustrative wholesale reference prices, SAR/kg
   tomato:{ar:'طماطم',p:3.5}, cucumber:{ar:'خيار',p:3.0}, carrot:{ar:'جزر',p:2.8},
@@ -401,11 +410,15 @@ const CLIENT = uid('c');
 const crop = k => PRICES[k] || PRICES.other;
 function km(a,b){const R=6371,t=x=>x*Math.PI/180;const dLa=t(b.lat-a.lat),dLo=t(b.lng-a.lng);const h=Math.sin(dLa/2)**2+Math.cos(t(a.lat))*Math.cos(t(b.lat))*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
 function endAt(l){return l.startAt + l.durationMin*60000}
-function state(l, now=Date.now()){ if(l.status==='sold') return 'sold'; if(now>=endAt(l)) return 'expired'; return 'live'; }
-function priceAt(l, now=Date.now()){
-  const f=Math.min(1,Math.max(0,(now-l.startAt)/(l.durationMin*60000)));
-  return Math.round((l.start-(l.start-l.floor)*f)*100)/100;
-}
+function sug(l){ return +(l.suggested ?? (l.market*SUGGEST_RATIO)).toFixed(2) }
+function minP(l){ return +(l.minPrice ?? l.floor ?? (l.market*MIN_RATIO)).toFixed(2) }
+function pend(l){ return (l.offers||[]).filter(o=>o.status==='pending') }
+function nOff(n){ return n===0?'لا عروض':n===1?'عرض واحد':n===2?'عرضان':n<=10?`${n} عروض`:`${n} عرضاً` }
+function best(l){ const p=pend(l); return p.length?Math.max(...p.map(o=>+o.price)):0 }
+function mine(l,bid){ return pend(l).find(o=>o.buyerId===bid) }
+function tag(l,o){ const ids=[...(l.offers||[])].sort((a,b)=>(a.since||a.at)-(b.since||b.at)).map(x=>x.buyerId).filter((v,i,a)=>a.indexOf(v)===i); return 'مشترٍ #'+(ids.indexOf(o.buyerId)+1) }
+// open: taking offers · review: window closed, farmer still choosing · sold · expired: closed with no offers
+function state(l, now=Date.now()){ if(l.status==='sold') return 'sold'; if(now<endAt(l)) return 'open'; return pend(l).length?'review':'expired'; }
 function mmss(ms){ms=Math.max(0,ms);const m=Math.floor(ms/60000),s=Math.floor(ms%60000/1000);return (m>=60?Math.floor(m/60)+':'+String(m%60).padStart(2,'0'):m)+':'+String(s).padStart(2,'0')}
 function ago(t){const m=Math.round((Date.now()-t)/60000);if(m<1)return'الآن';if(m<60)return`قبل ${m} د`;const h=Math.round(m/60);if(h<24)return`قبل ${h} س`;return`قبل ${Math.round(h/24)} يوم`}
 function dateAr(t){try{return new Date(t).toLocaleDateString('ar-SA-u-ca-gregory-nu-latn',{year:'numeric',month:'long',day:'numeric'})}catch(e){return new Date(t).toDateString()}}
@@ -428,33 +441,38 @@ const pref = {
 };
 const S = {
   farmId: pref.get('farm','f1'), buyerId: pref.get('buyer','b1'),
-  filter:'all', sort:'near', draft:null
+  filter:'all', sort:'near', draft:null, role:'buyer'
 };
 
 /* ---------- demo seed ---------- */
 function SEED(){
   const n=Date.now(), M=60000, D=86400000;
   const mk=(o)=>{const p=crop(o.crop).p, f=FARMS.find(x=>x.id===o.farmId);
-    return Object.assign({status:'live',grade:'cosmetic',confidence:.9,aiSource:'ai',items:0,photo:'',
-      market:p,start:+(p*START_RATIO).toFixed(2),floor:+(p*FLOOR_RATIO).toFixed(2),
+    return Object.assign({status:'live',grade:'cosmetic',confidence:.9,aiSource:'ai',items:0,photo:'',offers:[],
+      market:p,suggested:+(p*SUGGEST_RATIO).toFixed(2),minPrice:+(p*MIN_RATIO).toFixed(2),
       farmName:f.name,city:f.city,lat:f.lat,lng:f.lng,createdAt:o.startAt},o)};
-  const sold=(o,b,frac)=>{const l=mk(o);const B=BUYERS.find(x=>x.id===b);l.status='sold';l.buyerId=B.id;l.buyerName=B.name;l.buyerType=B.typeAr;
-    l.soldAt=l.startAt+l.durationMin*M*frac;l.soldPrice=priceAt(l,l.soldAt);l.total=+(l.soldPrice*l.kg).toFixed(2);
+  const off=(b,price,minsAgo)=>{const B=BUYERS.find(x=>x.id===b);const at=n-minsAgo*M;return {id:'o'+b+minsAgo,buyerId:B.id,buyerName:B.name,buyerType:B.typeAr,lat:B.lat,lng:B.lng,price,at,since:at,status:'pending'}};
+  const sold=(o,b,factor)=>{const l=mk(o);const B=BUYERS.find(x=>x.id===b);l.status='sold';l.buyerId=B.id;l.buyerName=B.name;l.buyerType=B.typeAr;
+    l.soldAt=l.startAt+l.durationMin*M*.6;l.soldPrice=+(l.market*factor).toFixed(2);l.total=+(l.soldPrice*l.kg).toFixed(2);
     l.certNo='WFR-'+new Date(l.soldAt).getFullYear()+'-'+String(10000+Math.floor((l.soldAt/1000)%89999)).slice(-5);return l};
   return [
-    mk({id:'L1',crop:'cucumber',kg:850,farmId:'f1',photo:'svg:cucumber',startAt:n-12*M,durationMin:60,defects:['انحناء في الشكل','طول غير قياسي'],aiNote:'انحناء دون علامات تلف، القشرة سليمة.',confidence:.93,items:2}),
-    mk({id:'L2',crop:'tomato',kg:1200,farmId:'f2',photo:'svg:tomato',startAt:n-35*M,durationMin:90,defects:['تفاوت في الحجم','شكل غير منتظم'],aiNote:'ثمار متماسكة، عيوب شكلية فقط.',confidence:.9,items:5}),
-    mk({id:'L3',crop:'carrot',kg:600,farmId:'f3',startAt:n-4*M,durationMin:60,defects:['التواء','تفرع الجذر'],aiNote:'جذور ملتوية ومتفرعة، اللون والصلابة طبيعيان.',confidence:.88}),
-    mk({id:'L4',crop:'orange',kg:900,farmId:'f4',startAt:n-50*M,durationMin:120,defects:['ندوب قشرية','حجم صغير'],aiNote:'ندوب سطحية على القشرة فقط، اللب سليم.',confidence:.91}),
-    mk({id:'L5',crop:'pepper',kg:400,farmId:'f1',startAt:n-2*M,durationMin:45,defects:['شكل غير منتظم','تفاوت اللون'],aiNote:'تشوه في الشكل مع تفاوت لوني طبيعي.',confidence:.87}),
-    sold({id:'H1',crop:'tomato',kg:1500,farmId:'f1',startAt:n-13*D,durationMin:60,defects:['تفاوت في الحجم']},'b1',.3),
-    sold({id:'H2',crop:'cucumber',kg:700,farmId:'f1',startAt:n-11*D,durationMin:60,defects:['انحناء']},'b2',.55),
-    sold({id:'H3',crop:'potato',kg:2000,farmId:'f3',startAt:n-9*D,durationMin:90,defects:['أشكال غير منتظمة']},'b4',.2),
-    sold({id:'H4',crop:'orange',kg:1100,farmId:'f4',startAt:n-7*D,durationMin:60,defects:['ندوب قشرية']},'b5',.4),
-    sold({id:'H5',crop:'carrot',kg:650,farmId:'f2',startAt:n-5*D,durationMin:60,defects:['التواء']},'b4',.7),
-    sold({id:'H6',crop:'tomato',kg:1800,farmId:'f2',startAt:n-3*D,durationMin:60,defects:['تشققات سطحية ملتئمة']},'b1',.15),
+    mk({id:'L1',crop:'cucumber',kg:850,farmId:'f1',photo:'svg:cucumber',startAt:n-25*M,durationMin:120,defects:['انحناء في الشكل','طول غير قياسي'],aiNote:'انحناء دون علامات تلف، القشرة سليمة.',confidence:.93,items:2,
+      offers:[off('b1',1.45,18),off('b2',1.40,9)]}),
+    mk({id:'L2',crop:'tomato',kg:1200,farmId:'f2',photo:'svg:tomato',startAt:n-40*M,durationMin:180,defects:['تفاوت في الحجم','شكل غير منتظم'],aiNote:'ثمار متماسكة، عيوب شكلية فقط.',confidence:.9,items:5,
+      offers:[off('b4',1.70,31),off('b1',1.80,14),off('b5',1.65,6)]}),
+    mk({id:'L3',crop:'carrot',kg:600,farmId:'f3',startAt:n-6*M,durationMin:120,defects:['التواء','تفرع الجذر'],aiNote:'جذور ملتوية ومتفرعة، اللون والصلابة طبيعيان.',confidence:.88}),
+    mk({id:'L4',crop:'orange',kg:900,farmId:'f4',startAt:n-55*M,durationMin:180,defects:['ندوب قشرية','حجم صغير'],aiNote:'ندوب سطحية على القشرة فقط، اللب سليم.',confidence:.91,
+      offers:[off('b5',2.30,22)]}),
+    mk({id:'L5',crop:'pepper',kg:400,farmId:'f1',startAt:n-12*M,durationMin:90,defects:['شكل غير منتظم','تفاوت اللون'],aiNote:'تشوه في الشكل مع تفاوت لوني طبيعي.',confidence:.87,
+      offers:[off('b2',2.90,4)]}),
+    sold({id:'H1',crop:'tomato',kg:1500,farmId:'f1',startAt:n-13*D,durationMin:60,defects:['تفاوت في الحجم']},'b1',.54),
+    sold({id:'H2',crop:'cucumber',kg:700,farmId:'f1',startAt:n-11*D,durationMin:60,defects:['انحناء']},'b2',.49),
+    sold({id:'H3',crop:'potato',kg:2000,farmId:'f3',startAt:n-9*D,durationMin:90,defects:['أشكال غير منتظمة']},'b4',.56),
+    sold({id:'H4',crop:'orange',kg:1100,farmId:'f4',startAt:n-7*D,durationMin:60,defects:['ندوب قشرية']},'b5',.52),
+    sold({id:'H5',crop:'carrot',kg:650,farmId:'f2',startAt:n-5*D,durationMin:60,defects:['التواء']},'b4',.46),
+    sold({id:'H6',crop:'tomato',kg:1800,farmId:'f2',startAt:n-3*D,durationMin:60,defects:['تشققات سطحية ملتئمة']},'b1',.57),
     sold({id:'H7',crop:'dates',kg:500,farmId:'f1',startAt:n-2*D,durationMin:45,defects:['حجم صغير','قشرة متجعدة']},'b3',.5),
-    sold({id:'H8',crop:'eggplant',kg:800,farmId:'f3',startAt:n-1*D,durationMin:60,defects:['انحناء','حجم صغير']},'b2',.35),
+    sold({id:'H8',crop:'eggplant',kg:800,farmId:'f3',startAt:n-1*D,durationMin:60,defects:['انحناء','حجم صغير']},'b2',.53),
   ];
 }
 
@@ -482,23 +500,38 @@ const Store = {
     }
     this.items.set(l.id,l); this.saveLocal(); onData();
   },
-  async buy(id, buyer, price){
-    const now=Date.now();
-    const sale=(l)=>{const p=Math.max(l.floor,Math.min(l.start,price));return {status:'sold',buyerId:buyer.id,buyerName:buyer.name,buyerType:buyer.typeAr,
-      soldAt:now,soldPrice:p,total:+(p*l.kg).toFixed(2),certNo:'WFR-'+new Date(now).getFullYear()+'-'+String(Math.floor(10000+Math.random()*89999))}};
+  // write a change to one listing safely (lease so two people cannot change it at once)
+  async mutate(id, fn){
     if(this.mode==='live'){
       const ref=this.db.collection('listings').doc(id);
       let lease; try{lease=await ref.acquire({holder:CLIENT,ttlMs:8000})}catch(e){lease={acquired:true}}
       if(!lease.acquired) throw {code:'busy'};
       const snap=await ref.get(); if(!snap.exists) throw {code:'gone'};
-      const l=snap.data(); if(state(l)!=='live') throw {code:'sold'};
-      const s=sale(l);
-      try{ await ref.update(s); }
-      catch(e){ if(e&&e.code==='invalid_argument'){ this.canWrite=false; this.goLocal(); } else throw e; }
-      if(this.mode==='live') return {...l,...s,id};
+      const l={...snap.data(),id}; const patch=fn(l);
+      try{ await ref.update(patch); return {...l,...patch}; }
+      catch(e){ if(e&&e.code==='invalid_argument'){ this.canWrite=false; this.goLocal(); toast('ليس لديك صلاحية الكتابة في السوق المشترك — تم الحفظ في وضع العرض المحلي'); } else throw e; }
     }
-    const l=this.items.get(id); if(!l||state(l)!=='live') throw {code:'sold'};
-    Object.assign(l,sale(l)); this.saveLocal(); onData(); return l;
+    const l=this.items.get(id); if(!l) throw {code:'gone'};
+    Object.assign(l,fn(l)); this.saveLocal(); onData(); return l;
+  },
+  offer(id, buyer, price){
+    return this.mutate(id, l=>{
+      if(state(l)!=='open') throw {code:'closed'};
+      if(price<minP(l)) throw {code:'low'};
+      const now=Date.now(), prev=(l.offers||[]).find(o=>o.buyerId===buyer.id);
+      const others=(l.offers||[]).filter(o=>o.buyerId!==buyer.id);
+      return {offers:[...others,{id:uid('o'),buyerId:buyer.id,buyerName:buyer.name,buyerType:buyer.typeAr,lat:buyer.lat,lng:buyer.lng,price:+(+price).toFixed(2),at:now,since:prev?.since||now,status:'pending'}]};
+    });
+  },
+  accept(id, offerId){
+    return this.mutate(id, l=>{
+      const st=state(l); if(st==='sold') throw {code:'sold'};
+      const o=(l.offers||[]).find(x=>x.id===offerId&&x.status==='pending'); if(!o) throw {code:'gone'};
+      const now=Date.now();
+      return {status:'sold',buyerId:o.buyerId,buyerName:o.buyerName,buyerType:o.buyerType,soldAt:now,soldPrice:+o.price,total:+(o.price*l.kg).toFixed(2),
+        certNo:'WFR-'+new Date(now).getFullYear()+'-'+String(Math.floor(10000+Math.random()*89999)),
+        offers:(l.offers||[]).map(x=>({...x,status:x.id===offerId?'accepted':(x.status==='pending'?'declined':x.status)}))};
+    });
   },
   async resetDemo(){
     const seeds=SEED();
@@ -524,8 +557,9 @@ async function initCaps(){
   try{
     Store.unsub=db.collection('listings').onSnapshot(snap=>{
       clearTimeout(timer);
+      const prev=Store.mode==='live'?Store.items:null;
       Store.items=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));
-      Store.mode='live'; onData();
+      Store.mode='live'; onData(); if(prev) notify(prev, Store.items);
     }, err=>{ clearTimeout(timer); Store.goLocal('error'); });
   }catch(e){ clearTimeout(timer); Store.goLocal(); }
 }
@@ -592,6 +626,27 @@ async function analyze(src, sampleKey){
 }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
+/* ---------- live notifications (shared market only) ---------- */
+function notify(prev, next){
+  for(const [id,l] of next){
+    const o=prev.get(id); if(!o) continue;
+    // farmer: a new or raised offer on one of my listings
+    if(S.role==='farmer' && l.farmId===S.farmId && l.status!=='sold'){
+      const fresh=pend(l).filter(x=>!pend(o).some(y=>y.id===x.id));
+      if(fresh.length){ const x=fresh.at(-1); toast(`عرض جديد على ${crop(l.crop).ar}: ${NF(x.price,2)} ر.س/كجم من ${tag(l,x)}`); }
+    }
+    // buyer: my offer was accepted, or the farmer chose someone else
+    if(S.role!=='farmer' && o.status!=='sold' && l.status==='sold'){
+      if(l.buyerId===S.buyerId){
+        modal(`<div style="text-align:center">${BIG('check','#1d5a3c','#e3efdc')}<h3>قبل المزارع عرضك!</h3><p class="muted">${esc(crop(l.crop).ar)} — ${NF(l.kg)} كجم بسعر ${NF(l.soldPrice,2)} ر.س/كجم. أنقذتَ ${NF(l.kg)} كجم وتجنبتَ ${NF(l.kg*CO2_PER_KG)} كجم CO₂.</p>
+          <div style="display:flex;gap:10px;justify-content:center;margin-top:14px"><a class="btn btn-primary" href="#cert-${id}" onclick="closeModal()">${I('award')} شهادة الاستدامة</a><button class="btn btn-ghost" onclick="closeModal()">إغلاق</button></div></div>`);
+      } else if((o.offers||[]).some(x=>x.buyerId===S.buyerId&&x.status==='pending')){
+        toast(`اختار المزارع عرضاً آخر على ${crop(l.crop).ar}`);
+      }
+    }
+  }
+}
+
 /* ============================================================
    VIEWS
    ============================================================ */
@@ -603,6 +658,7 @@ function route(){
   if(h.startsWith('l-')){VIEW='listing';PARAM=h.slice(2)}
   else if(h.startsWith('cert-')){VIEW='cert';PARAM=h.slice(5)}
   else {VIEW=['home','farmer','market','impact'].includes(h)?h:'home';PARAM=null}
+  if(VIEW==='farmer') S.role='farmer'; else if(VIEW==='market') S.role='buyer';
   document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('on',a.dataset.r===VIEW||(VIEW==='listing'&&a.dataset.r==='market')));
   renderShell(); renderDyn(); window.scrollTo(0,0);
 }
@@ -635,7 +691,7 @@ function renderShell(){
 function renderDyn(){
   const d=$('#dyn'); if(!d) return;
   if(VIEW==='home') d.innerHTML=homeDyn();
-  else if(VIEW==='farmer') d.innerHTML=farmerDyn();
+  else if(VIEW==='farmer') {d.innerHTML=farmerDyn(); bindCards();}
   else if(VIEW==='market') {d.innerHTML=marketDyn(); bindCards();}
   else if(VIEW==='impact') d.innerHTML=impactDyn();
   else if(VIEW==='listing') {d.innerHTML=listingDyn(); bindListing();}
@@ -651,7 +707,7 @@ function metrics(){
   const save=sold.reduce((a,l)=>a+((+l.market||0)-(+l.soldPrice||0))*(+l.kg||0),0);
   const mins=sold.map(l=>(l.soldAt-l.startAt)/60000).filter(x=>x>=0);
   const avgMin=mins.length?mins.reduce((a,b)=>a+b,0)/mins.length:0;
-  return {sold,kg,co2:kg*CO2_PER_KG,rev,save,deals:sold.length,avgMin,live:Store.list().filter(l=>state(l)==='live').length};
+  return {sold,kg,co2:kg*CO2_PER_KG,rev,save,deals:sold.length,avgMin,live:Store.list().filter(l=>state(l)==='open').length};
 }
 
 /* ---------- HOME ---------- */
@@ -661,7 +717,7 @@ function homeShell(){
     <div>
       <div class="eyebrow">منصة B2B بالذكاء الاصطناعي · الأمن الغذائي والاستدامة</div>
       <h1 style="margin-top:10px">المحصول <em>المرفوض شكلياً</em><br>ليس هدراً… إنه وفرة.</h1>
-      <p class="lead">يصوّر المزارع محصوله، فيفرّق الذكاء الاصطناعي بين <b>العيب الشكلي</b> و<b>التلف الحقيقي</b> ويقترح سعراً عادلاً، ثم يُطرح في مزاد تنازلي لأقرب مصانع العصائر والمطابخ السحابية — وكل صفقة تصدر لها شهادة استدامة موثقة.</p>
+      <p class="lead">يصوّر المزارع محصوله، فيفرّق الذكاء الاصطناعي بين <b>العيب الشكلي</b> و<b>التلف الحقيقي</b> ويقترح سعراً عادلاً، ثم تصل عروض أقرب مصانع العصائر والمطاعم ويختار المزارع الأنسب — وكل صفقة تصدر لها شهادة استدامة موثقة.</p>
       <div class="ctas">
         <a class="btn btn-primary btn-lg" href="#farmer">${I('camera')} أنا مزارع — اعرض محصولي</a>
         <a class="btn btn-ghost btn-lg" href="#market">${I('factory')} أنا مشترٍ — تصفح السوق</a>
@@ -695,7 +751,7 @@ function homeShell(){
     <div class="steps">
       <div class="card step"><div class="sic">${I('camera')}</div><h3>تصوير المحصول</h3><p>المزارع يرفع صورة من جواله ويحدد الكمية.</p></div>
       <div class="card step"><div class="sic">${I('spark')}</div><h3>فحص بالذكاء الاصطناعي</h3><p>تصنيف فوري: عيب شكلي أو تلف حقيقي مع نسبة الثقة والعيوب.</p></div>
-      <div class="card step"><div class="sic">${I('timer')}</div><h3>مزاد تنازلي ذكي</h3><p>يبدأ بخصم 40% وينزل حتى 60% من سعر الجملة، والأولوية للأقرب.</p></div>
+      <div class="card step"><div class="sic">${I('send')}</div><h3>عروض المشترين</h3><p>أقرب المصانع والمطاعم يقدّمون عروضهم بأسماء مخفية، والمزارع يختار الأنسب.</p></div>
       <div class="card step"><div class="sic">${I('award')}</div><h3>شهادة استدامة</h3><p>توثيق الكمية المنقذة و CO₂ المتجنب لكل صفقة.</p></div>
     </div>
   </section>
@@ -723,7 +779,7 @@ function homeDyn(){
     <div class="card kpi"><div class="v num">${NF(m.kg)}</div><div class="l">كجم تم إنقاذها من الهدر</div></div>
     <div class="card kpi"><div class="v num">${NF(m.co2/1000,1)}</div><div class="l">طن CO₂e تم تجنبها</div><div class="s">بمعامل ${CO2_PER_KG} كجم لكل كجم</div></div>
     <div class="card kpi"><div class="v num">${NF(m.rev)}</div><div class="l">ريال عادت للمزارعين</div></div>
-    <div class="card kpi"><div class="v num">${m.live}</div><div class="l">مزاد مباشر الآن</div><div class="s"><a href="#market">افتح السوق ←</a></div></div>
+    <div class="card kpi"><div class="v num">${m.live}</div><div class="l">محصول يستقبل العروض الآن</div><div class="s"><a href="#market">افتح السوق ←</a></div></div>
   </div>`;
 }
 
@@ -772,7 +828,7 @@ function renderWork(){
       <div style="margin-top:14px"><button class="btn btn-ghost" id="again">↺ صورة أخرى</button></div></div>`;
   } else if(d.result){
     const r=d.result, G=GRADES[r.grade], c=crop(d.crop), p=c.p;
-    const st=+(p*START_RATIO).toFixed(2), fl=+(p*FLOOR_RATIO).toFixed(2), kg=+d.kg||0;
+    const st=+(p*SUGGEST_RATIO).toFixed(2), fl=+(p*MIN_RATIO).toFixed(2), kg=+d.kg||0;
     const srcTxt=r.source==='ai'?'محرك الرؤية الحاسوبية (Vision AI)':r.source==='preset'?'نتيجة مُعدّة مسبقاً للصورة التوضيحية':'تحليل لوني محلي مبسّط (بدون اتصال)';
     html+=`<div class="result">
       <div class="verdict ${G.cls}"><div class="big" style="color:${G.color}">${I(G.icon)}</div><div style="flex:1">
@@ -792,17 +848,17 @@ function renderWork(){
       <div class="fgrid">
         <div><label class="f">نوع المحصول</label><select class="inp" id="cropSel">${Object.entries(PRICES).map(([k,v])=>`<option value="${k}" ${k===d.crop?'selected':''}>${v.ar}</option>`).join('')}</select></div>
         <div><label class="f">الكمية (كجم)</label><input class="inp num" id="kgIn" type="number" min="10" step="10" value="${kg||''}" placeholder="مثال: 500"></div>
-        <div><label class="f">مدة المزاد</label><select class="inp" id="durSel">${[30,60,90,120].map(m=>`<option value="${m}" ${m==d.dur?'selected':''}>${m} دقيقة</option>`).join('')}</select></div>
+        <div><label class="f">مدة استقبال العروض</label><select class="inp" id="durSel">${[30,60,120,180].map(m=>`<option value="${m}" ${m==d.dur?'selected':''}>${m<60?m+' دقيقة':m/60===1?'ساعة':m/60===2?'ساعتان':m/60+' ساعات'}</option>`).join('')}</select></div>
         <div><label class="f">سعر الجملة المرجعي</label><div class="inp num" style="background:var(--bg)">${NF(p,2)} ر.س/كجم</div></div>
       </div>
       <div class="calc">
-        <div><b class="num">${NF(st,2)} ← ${NF(fl,2)}</b><span>سعر المزاد ر.س/كجم</span></div>
-        <div><b class="num">${kg?NF(kg*(st+fl)/2):'—'}</b><span>دخل متوقع (ر.س)</span></div>
+        <div><b class="num">${NF(st,2)}</b><span>السعر المقترح ر.س/كجم</span></div>
+        <div><b class="num">${kg?NF(kg*st):'—'}</b><span>دخل متوقع (ر.س)</span></div>
         <div><b class="num">${kg?NF(kg*CO2_PER_KG):'—'}</b><span>كجم CO₂ ستُتجنب</span></div>
       </div>
-      <div class="src-note">السعر يبدأ بخصم 40% وينخفض تدريجياً حتى 60% · أول ${PRIORITY_MIN} دقائق أولوية للمشترين ضمن ${PRIORITY_KM} كم.</div>
+      <div class="src-note">يقدّم أقرب المشترين عروضهم بأسماء مخفية، وتختار أنت العرض الأنسب · لا تُقبل عروض أقل من ${NF(fl,2)} ر.س/كجم.</div>
       <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
-        <button class="btn btn-primary btn-lg" id="pub" ${kg>=10?'':'disabled'}>${I('send')} اطرح في المزاد الآن</button>
+        <button class="btn btn-primary btn-lg" id="pub" ${kg>=10?'':'disabled'}>${I('send')} اعرض للمشترين الآن</button>
         <button class="btn btn-ghost" id="again">إلغاء</button>
       </div>`;
     }
@@ -822,7 +878,7 @@ async function startFile(file){
 }
 function startSample(key){ runDraft(svgURL(key), key); }
 async function runDraft(src, sampleKey){
-  S.draft={src, sampleKey, result:null, crop:sampleKey?SAMPLES.find(s=>s.key===sampleKey).crop:'tomato', kg:'', dur:60};
+  S.draft={src, sampleKey, result:null, crop:sampleKey?SAMPLES.find(s=>s.key===sampleKey).crop:'tomato', kg:'', dur:120};
   const myDraft=S.draft; renderWork();
   let r; try{ r=await analyze(src, sampleKey); }catch(e){ r={source:'local',grade:'cosmetic',confidence:.6,defects:[],note:''}; }
   if(S.draft!==myDraft) return;
@@ -835,32 +891,67 @@ async function publish(){
   const f=FARMS.find(x=>x.id===S.farmId)||FARMS[0], p=crop(d.crop).p, now=Date.now();
   let photo=d.sampleKey?('svg:'+d.sampleKey):''; if(!photo){try{photo=await thumb(d.src)}catch(e){photo=''}}
   const l={id:uid('L'),crop:d.crop,kg,grade:d.result.grade,confidence:d.result.confidence,defects:d.result.defects||[],aiNote:d.result.note||'',aiSource:d.result.source,items:d.result.items||0,
-    photo,farmId:f.id,farmName:f.name,city:f.city,lat:f.lat,lng:f.lng,market:p,start:+(p*START_RATIO).toFixed(2),floor:+(p*FLOOR_RATIO).toFixed(2),
-    startAt:now,durationMin:+d.dur||60,status:'live',createdAt:now};
+    photo,farmId:f.id,farmName:f.name,city:f.city,lat:f.lat,lng:f.lng,market:p,suggested:+(p*SUGGEST_RATIO).toFixed(2),minPrice:+(p*MIN_RATIO).toFixed(2),
+    startAt:now,durationMin:+d.dur||120,status:'live',offers:[],createdAt:now};
   try{ await Store.put(l); S.draft=null; renderWork(); renderDyn();
-    modal(`<div style="text-align:center">${BIG('check','#1d5a3c','#e3efdc')}<h3>تم طرح محصولك في المزاد!</h3><p class="muted">${crop(l.crop).e} ${NF(kg)} كجم ${esc(crop(l.crop).ar)} — يظهر الآن لأقرب المصانع والمطابخ.</p>
-      <div style="display:flex;gap:10px;justify-content:center;margin-top:14px"><a class="btn btn-primary" href="#l-${l.id}" onclick="closeModal()">عرض المزاد</a><button class="btn btn-ghost" onclick="closeModal()">إغلاق</button></div></div>`);
-  }catch(e){ toast('تعذر الطرح — حاول مرة أخرى'); btn.disabled=false; btn.innerHTML=I('send')+' اطرح في المزاد الآن'; }
+    modal(`<div style="text-align:center">${BIG('check','#1d5a3c','#e3efdc')}<h3>محصولك معروض الآن للمشترين!</h3><p class="muted">${crop(l.crop).e} ${NF(kg)} كجم ${esc(crop(l.crop).ar)} — ستظهر عروض أقرب المصانع والمطاعم في قائمة "عروضي" لحظياً، وتختار منها ما يناسبك.</p>
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:14px"><button class="btn btn-primary" onclick="closeModal()">متابعة العروض</button></div></div>`);
+  }catch(e){ toast('تعذر الطرح — حاول مرة أخرى'); btn.disabled=false; btn.innerHTML=I('send')+' اعرض للمشترين الآن'; }
+}
+function stBadge(s){ return `<span class="badge ${s==='sold'?'b-sold':s==='open'?'b-live':s==='review'?'b-cosmetic':'b-spoiled'}">${s==='sold'?'مُباع ✓':s==='open'?'يستقبل العروض':s==='review'?'بانتظار قرارك':'انتهت المدة'}</span>` }
+function offerRows(l, forFarmer){
+  const list=[...pend(l)].sort((a,b)=>b.price-a.price), top=list[0];
+  if(!list.length) return `<div class="small muted" style="padding:6px 2px">${state(l)==='open'?'بانتظار عروض المشترين…':'لا توجد عروض.'}</div>`;
+  return `<div class="offers">${list.map(o=>{const dist=Math.round(km(o,l)), isMe=!forFarmer&&o.buyerId===S.buyerId;
+    return `<div class="orow ${o===top?'top':''}">
+      <div class="who"><b>${tag(l,o)}</b>${isMe?' <span class="badge b-live">عرضك</span>':''}${o===top?' <span class="badge b-cosmetic">الأعلى</span>':''}<div class="small muted">${forFarmer?`${I('pin')} على بعد <span class="num">${NF(dist)}</span> كم · `:''}${ago(o.at)}</div></div>
+      <div class="amt"><b class="num">${NF(o.price,2)}</b> <span class="small">ر.س/كجم</span><div class="small muted num">${NF(o.price*l.kg)} ر.س</div></div>
+      ${forFarmer?`<button class="btn btn-primary" data-accept="${l.id}|${o.id}">قبول</button>`:''}
+    </div>`}).join('')}</div>`;
 }
 function farmerDyn(){
-  const mine=Store.list().filter(l=>l.farmId===S.farmId).sort((a,b)=>b.startAt-a.startAt);
+  const mineL=Store.list().filter(l=>l.farmId===S.farmId).sort((a,b)=>b.startAt-a.startAt);
   if(Store.mode==='connecting') return `<div class="muted small">جارٍ التحميل…</div>`;
-  if(!mine.length) return `<div class="empty">لا توجد عروض بعد لهذه المزرعة.<br>ابدأ بتصوير محصولك.</div>`;
-  const earned=mine.filter(l=>l.status==='sold').reduce((a,l)=>a+(+l.total||0),0);
-  return `<div class="small" style="margin-bottom:10px">إجمالي الدخل من المحاصيل المنقذة: <b class="num" style="color:var(--green)">${NF(earned)} ر.س</b></div>
-  <div class="mine">${mine.slice(0,12).map(l=>{const s=state(l);return `<a class="mi" href="#l-${l.id}">${photoHTML(l)}<div class="x"><b>${crop(l.crop).e} ${esc(crop(l.crop).ar)} · <span class="num">${NF(l.kg)}</span> كجم</b>
-    <div class="small muted">${s==='sold'?`بيع لـ${esc(l.buyerType||'مشترٍ')} بـ <span class="num">${NF(l.total)}</span> ر.س`:s==='live'?`السعر الآن <span class="num" data-p="${l.id}">${NF(priceAt(l),2)}</span> ر.س/كجم · متبقٍ <span class="num" data-c="${l.id}"></span>`:'انتهى المزاد دون بيع'}</div></div>
-    <span class="badge ${s==='sold'?'b-sold':s==='live'?'b-live':'b-spoiled'}">${s==='sold'?'مُباع ✓':s==='live'?'مباشر':'منتهٍ'}</span></a>`}).join('')}</div>`;
+  if(!mineL.length) return `<div class="empty">لا توجد عروض بعد لهذه المزرعة.<br>ابدأ بتصوير محصولك.</div>`;
+  const earned=mineL.filter(l=>l.status==='sold').reduce((a,l)=>a+(+l.total||0),0);
+  const waiting=mineL.reduce((a,l)=>a+(l.status!=='sold'?pend(l).length:0),0);
+  return `<div class="small" style="margin-bottom:10px">إجمالي الدخل من المحاصيل المنقذة: <b class="num" style="color:var(--green)">${NF(earned)} ر.س</b>${waiting?` · ${nOff(waiting)} بانتظار قرارك`:''}</div>
+  <div class="mine">${mineL.slice(0,12).map(l=>{const s=state(l);return `<div class="fl card">
+    <a class="mi" href="#l-${l.id}">${photoHTML(l)}<div class="x"><b>${crop(l.crop).e} ${esc(crop(l.crop).ar)} · <span class="num">${NF(l.kg)}</span> كجم</b>
+    <div class="small muted">${s==='sold'?`بيع لـ${esc(l.buyerType||'مشترٍ')} بـ <span class="num">${NF(l.soldPrice,2)}</span> ر.س/كجم · <span class="num">${NF(l.total)}</span> ر.س`:s==='open'?`السعر المقترح <span class="num">${NF(sug(l),2)}</span> ر.س/كجم · تُغلق بعد <span class="num" data-c="${l.id}"></span>`:s==='review'?'انتهت مدة العروض — اختر عرضاً':'انتهت المدة دون عروض'}</div></div>
+    ${stBadge(s)}</a>
+    ${s==='open'||s==='review'?offerRows(l,true):''}
+  </div>`}).join('')}</div>`;
+}
+function openAccept(lid, oid){
+  const l=Store.items.get(lid); const o=l&&pend(l).find(x=>x.id===oid); if(!o){toast('هذا العرض لم يعد متاحاً');return}
+  modal(`<h3>قبول عرض ${tag(l,o)}؟</h3>
+    <div class="sum">
+      <span>المحصول</span><b>${esc(crop(l.crop).ar)} — ${NF(l.kg)} كجم</b>
+      <span>السعر</span><b class="num">${NF(o.price,2)} ر.س/كجم</b>
+      <span>المسافة</span><b class="num">${NF(km(o,l))} كم</b>
+      <span style="font-weight:600">دخلك من الصفقة</span><span class="tot num">${NF(o.price*l.kg)} ر.س</span>
+    </div>
+    <div class="small muted">ستُرفض بقية العروض تلقائياً ويُبلَّغ أصحابها. تُعرف جهة المشتري بعد القبول لتنسيق الاستلام.</div>
+    <div style="display:flex;gap:10px;margin-top:16px"><button class="btn btn-primary btn-lg" id="cAcc" style="flex:1">تأكيد القبول</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button></div>`);
+  $('#cAcc').onclick=async()=>{
+    const b=$('#cAcc'); b.disabled=true; b.innerHTML='<span class="spin"></span> جارٍ التأكيد…';
+    try{ const done=await Store.accept(lid,oid);
+      modal(`<div style="text-align:center">${BIG('sprout','#1d5a3c','#e3efdc')}<h3>تمت الصفقة!</h3>
+        <p class="muted">بعتَ ${NF(done.kg)} كجم بـ <b class="num">${NF(done.total)}</b> ر.س بدل إتلافها، وتجنّبتَ ${NF(done.kg*CO2_PER_KG)} كجم CO₂. المشتري: ${esc(done.buyerType||'')}.</p>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:14px"><a class="btn btn-primary" href="#cert-${lid}" onclick="closeModal()">${I('award')} شهادة الصفقة</a><button class="btn btn-ghost" onclick="closeModal()">إغلاق</button></div></div>`);
+    }catch(e){ closeModal(); toast(e&&e.code==='busy'?'يجري تحديث العرض الآن — حاول بعد ثوانٍ':e&&e.code==='sold'?'تم بيع هذا المحصول بالفعل':'تعذر قبول العرض'); }
+  };
 }
 
 /* ---------- MARKET ---------- */
 function buyer(){return BUYERS.find(b=>b.id===S.buyerId)||BUYERS[0]}
 function marketShell(){
   return `
-  <div class="sec-h"><div><div class="eyebrow">سوق الإنقاذ</div><h2>مزادات مباشرة لمحاصيل سليمة بأسعار مخفضة</h2></div></div>
+  <div class="sec-h"><div><div class="eyebrow">سوق الإنقاذ</div><h2>محاصيل سليمة بأسعار مخفضة — قدّم عرضك</h2></div></div>
   <div class="toolbar">
     <div class="who"><label class="f">أشتري بصفتي</label><select class="inp" id="buyerSel">${BUYERS.map(b=>`<option value="${b.id}" ${b.id===S.buyerId?'selected':''}>${esc(b.name)} — ${esc(b.typeAr)} (${esc(b.city)})</option>`).join('')}</select></div>
-    <div><label class="f">ترتيب</label><select class="inp" id="sortSel"><option value="near">الأقرب أولاً</option><option value="price">الأقل سعراً</option><option value="ending">ينتهي قريباً</option></select></div>
+    <div><label class="f">ترتيب</label><select class="inp" id="sortSel"><option value="near">الأقرب أولاً</option><option value="price">الأقل سعراً</option><option value="ending">يُغلق قريباً</option><option value="fresh">الأقل عروضاً</option></select></div>
     <div style="flex:1"><label class="f">المحصول</label><div class="fchips" id="fchips"></div></div>
   </div>
   <div id="dyn"></div>`;
@@ -872,61 +963,72 @@ function bindMarket(){
 function marketDyn(){
   const B=buyer(), now=Date.now();
   const all=Store.list();
-  const live=all.filter(l=>state(l,now)==='live');
+  const live=all.filter(l=>state(l,now)==='open');
   const crops=[...new Set(live.map(l=>l.crop))];
   const fc=$('#fchips'); if(fc){ fc.innerHTML=[['all','الكل']].concat(crops.map(k=>[k,crop(k).e+' '+crop(k).ar])).map(([k,t])=>`<button data-f="${k}" class="${S.filter===k?'on':''}">${t}</button>`).join(''); fc.querySelectorAll('button').forEach(b=>b.onclick=()=>{S.filter=b.dataset.f;renderDyn()}); }
   let rows=live.filter(l=>S.filter==='all'||l.crop===S.filter).map(l=>({l,d:km(B,l)}));
-  if(S.sort==='near') rows.sort((a,b)=>a.d-b.d); else if(S.sort==='price') rows.sort((a,b)=>priceAt(a.l)-priceAt(b.l)); else rows.sort((a,b)=>endAt(a.l)-endAt(b.l));
+  if(S.sort==='near') rows.sort((a,b)=>a.d-b.d); else if(S.sort==='price') rows.sort((a,b)=>sug(a.l)-sug(b.l)); else if(S.sort==='fresh') rows.sort((a,b)=>pend(a.l).length-pend(b.l).length); else rows.sort((a,b)=>endAt(a.l)-endAt(b.l));
   const recent=all.filter(l=>l.status==='sold').sort((a,b)=>b.soldAt-a.soldAt).slice(0,6);
   if(Store.mode==='connecting') return `<div class="grid">${[1,2,3].map(()=>`<div class="card" style="height:330px;opacity:.5"></div>`).join('')}</div>`;
   return `
-  ${rows.length?`<div class="grid">${rows.map(({l,d})=>card(l,d,B)).join('')}</div>`:`<div class="empty">لا توجد مزادات مباشرة الآن${S.filter!=='all'?' لهذا المحصول':''}.<br>عند طرح مزارع لمحصول جديد سيظهر هنا فوراً.</div>`}
+  ${rows.length?`<div class="grid">${rows.map(({l,d})=>card(l,d,B)).join('')}</div>`:`<div class="empty">لا توجد محاصيل تستقبل العروض الآن${S.filter!=='all'?' لهذا المحصول':''}.<br>عند طرح مزارع لمحصول جديد سيظهر هنا فوراً.</div>`}
   <section class="block"><div class="sec-h"><h2 style="font-size:20px">آخر الصفقات المكتملة</h2><span class="small muted">${I('lock')} هوية المشترين محمية</span></div>
   ${recent.length?`<div class="card" style="overflow:auto"><table class="tb"><thead><tr><th>المحصول</th><th>الكمية</th><th>نوع المشتري</th><th>السعر</th><th>CO₂ متجنب</th></tr></thead><tbody>
   ${recent.map(l=>`<tr><td>${crop(l.crop).e} ${esc(crop(l.crop).ar)}<div class="small muted">${esc(l.farmName)}</div></td><td class="num">${NF(l.kg)} كجم</td><td>${esc(l.buyerType||'مشترٍ')}<div class="small muted">${ago(l.soldAt)}</div></td><td class="num">${NF(l.soldPrice,2)} ر.س/كجم</td><td class="num">${NF(l.kg*CO2_PER_KG)} كجم</td></tr>`).join('')}
   </tbody></table></div>`:`<div class="empty">لا توجد صفقات بعد.</div>`}</section>`;
 }
-function lockLeft(l,d,now=Date.now()){ if(d<=PRIORITY_KM) return 0; return Math.max(0,l.startAt+PRIORITY_MIN*60000-now); }
+function offerBtn(l, big){
+  const me=mine(l,S.buyerId);
+  return me?`<button class="btn btn-ghost${big?' btn-lg':''}" style="width:100%" data-offer="${l.id}">${I('check')} عرضك <b class="num">${NF(me.price,2)}</b> · تعديل</button>`
+           :`<button class="btn btn-amber${big?' btn-lg':''}" style="width:100%" data-offer="${l.id}">${I('send')} قدّم عرضك</button>`;
+}
 function card(l,d,B){
-  const c=crop(l.crop), p=priceAt(l), disc=Math.round((1-p/l.market)*100), lk=lockLeft(l,d);
+  const c=crop(l.crop), p=sug(l), n=pend(l).length, b=best(l);
   return `<div class="card lc">
-    <a class="ph" href="#l-${l.id}">${photoHTML(l)}<div class="tl"><span class="badge b-cosmetic">${I('check')} ${GRADES[l.grade]?.short||'عيب شكلي'} · ${Math.round((l.confidence||0)*100)}%</span></div><div class="disc num" dir="ltr" data-dc="${l.id}">-${disc}%</div></a>
+    <a class="ph" href="#l-${l.id}">${photoHTML(l)}<div class="tl"><span class="badge b-cosmetic">${I('check')} ${GRADES[l.grade]?.short||'عيب شكلي'} · ${Math.round((l.confidence||0)*100)}%</span></div><div class="disc num" dir="ltr">-${Math.round((1-p/l.market)*100)}%</div></a>
     <div class="bd">
       <a href="#l-${l.id}" style="text-decoration:none"><h3>${c.e} ${esc(c.ar)} · <span class="num">${NF(l.kg)}</span> كجم</h3></a>
       <div class="meta"><span>${I('farm')} ${esc(l.farmName)}</span><span>${I('pin')} ${esc(l.city)} · <span class="num">${NF(d)}</span> كم</span></div>
       <div class="chips" style="margin:0">${(l.defects||[]).slice(0,2).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}</div>
-      <div class="price"><span class="now num" data-p="${l.id}">${NF(p,2)}</span><span class="small">ر.س/كجم</span><span class="was num">${NF(l.market,2)}</span></div>
+      <div class="price"><span class="small">السعر المقترح</span><span class="now num">${NF(p,2)}</span><span class="small">ر.س/كجم</span><span class="was num">${NF(l.market,2)}</span></div>
+      <div class="obox">${n?`أعلى عرض <b class="num">${NF(b,2)}</b> ر.س/كجم · ${nOff(n)}`:'لا عروض بعد — كن أول من يقدّم عرضاً'}</div>
       <div class="bar"><i data-b="${l.id}" style="width:0"></i></div>
-      <div class="cd"><span>${I('timer')} متبقٍ <b class="num" data-c="${l.id}"></b></span><span>الحد الأدنى <span class="num">${NF(l.floor,2)}</span></span></div>
-      <div style="margin-top:auto;padding-top:6px" data-lk="${l.id}" data-km="${Math.round(d)}">${lk?lockHTML(lk):`<button class="btn btn-amber" style="width:100%" data-buy="${l.id}">${I('bolt')} اشترِ الآن</button>`}</div>
+      <div class="cd"><span>${I('timer')} تُغلق العروض بعد <b class="num" data-c="${l.id}"></b></span><span>الحد الأدنى <span class="num">${NF(minP(l),2)}</span></span></div>
+      <div style="margin-top:auto;padding-top:6px">${offerBtn(l)}</div>
     </div></div>`;
 }
-function lockHTML(ms){return `<div class="lock">${I('lock')} أولوية للمشترين ضمن ${PRIORITY_KM} كم — متاح لك بعد <b class="num">${mmss(ms)}</b></div>`}
-function bindCards(){ document.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>openBuy(b.dataset.buy)); }
+function bindCards(){
+  document.querySelectorAll('[data-offer]').forEach(b=>b.onclick=()=>openOffer(b.dataset.offer));
+  document.querySelectorAll('[data-accept]').forEach(b=>b.onclick=()=>{const [l,o]=b.dataset.accept.split('|');openAccept(l,o)});
+}
 
-function openBuy(id){
-  const l=Store.items.get(id); if(!l||state(l)!=='live'){toast('هذا المزاد لم يعد متاحاً');return}
-  const B=buyer(), p=priceAt(l), tot=p*l.kg, save=(l.market-p)*l.kg;
-  modal(`<h3>تأكيد الشراء</h3>
-    <div style="display:flex;gap:12px;align-items:center"><div style="width:70px;height:56px;border-radius:10px;overflow:hidden;flex:none">${photoHTML(l)}</div><div><b>${crop(l.crop).e} ${esc(crop(l.crop).ar)} — ${NF(l.kg)} كجم</b><div class="small muted">${esc(l.farmName)} · ${esc(l.city)}</div></div></div>
-    <div class="sum">
-      <span>المشتري</span><b>${esc(B.name)}</b>
-      <span>السعر المثبت الآن</span><b class="num">${NF(p,2)} ر.س/كجم</b>
-      <span>توفيرك مقارنة بسعر الجملة</span><b class="num" style="color:var(--green2)">${NF(save)} ر.س</b>
-      <span>CO₂ ستتجنبه</span><b class="num">${NF(l.kg*CO2_PER_KG)} كجم</b>
-      <span style="font-weight:600">الإجمالي</span><span class="tot num">${NF(tot)} ر.س</span>
-    </div>
-    <div class="small muted">يُثبَّت السعر لحظة الضغط على "تأكيد". الدفع والاستلام يتمّان عبر الشريك اللوجستي (خارج نطاق النموذج الأولي).</div>
-    <div style="display:flex;gap:10px;margin-top:16px"><button class="btn btn-primary btn-lg" id="cBuy" style="flex:1">تأكيد الشراء</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button></div>`);
-  $('#cBuy').onclick=async()=>{
-    const b=$('#cBuy'); b.disabled=true; b.innerHTML='<span class="spin"></span> جارٍ التأكيد…';
-    try{ const done=await Store.buy(id,B,p);
-      modal(`<div style="text-align:center">${BIG('sprout','#1d5a3c','#e3efdc')}<h3>تمت الصفقة بنجاح!</h3>
-        <p class="muted">أنقذتَ <b class="num">${NF(done.kg)}</b> كجم من الهدر وتجنبتَ <b class="num">${NF(done.kg*CO2_PER_KG)}</b> كجم من CO₂.</p>
-        <div style="display:flex;gap:10px;justify-content:center;margin-top:14px"><a class="btn btn-primary" href="#cert-${done.id||id}" onclick="closeModal()">${I('award')} عرض شهادة الاستدامة</a><button class="btn btn-ghost" onclick="closeModal()">إغلاق</button></div></div>`);
+function openOffer(id){
+  const l=Store.items.get(id); if(!l||state(l)!=='open'){toast('انتهت مدة استقبال العروض لهذا المحصول');return}
+  const B=buyer(), me=mine(l,B.id), b=best(l), lo=minP(l), hi=l.market;
+  const r05=v=>Math.round(v*20)/20;
+  let v=me?+me.price:Math.min(hi,Math.max(sug(l), b?r05(b+0.05):0));
+  const quick=[['السعر المقترح',sug(l)],...(b?[['أعلى عرض + 0.05',Math.min(hi,r05(b+0.05))]]:[]),['الحد الأدنى',lo]];
+  modal(`<h3>${me?'تعديل عرضك':'قدّم عرضك'}</h3>
+    <div style="display:flex;gap:12px;align-items:center"><div style="width:70px;height:56px;border-radius:10px;overflow:hidden;flex:none">${photoHTML(l)}</div><div><b>${crop(l.crop).e} ${esc(crop(l.crop).ar)} — ${NF(l.kg)} كجم (الكمية كاملة)</b><div class="small muted">${esc(l.farmName)} · ${esc(l.city)} · ${nOff(pend(l).length)} حالياً${b?` · الأعلى ${NF(b,2)}`:''}</div></div></div>
+    <label class="f" style="margin-top:16px">سعرك (ر.س/كجم)</label>
+    <input class="inp num" id="oPrice" type="number" step="0.05" min="${lo}" max="${hi}" value="${v.toFixed(2)}" style="font-size:22px">
+    <div class="fchips" style="margin-top:8px">${quick.map(([t,x])=>`<button type="button" data-q="${x}">${t} <span class="num">${NF(x,2)}</span></button>`).join('')}</div>
+    <div class="sum" id="oSum"></div>
+    <div class="small muted">${I('lock')} يرى المزارع عرضك باسم "${me?tag(l,me):'مشترٍ #'+(new Set((l.offers||[]).map(o=>o.buyerId)).size+1)}" دون اسم جهتك. يختار المزارع العرض الأنسب، وستصلك رسالة فور القبول.</div>
+    <div style="display:flex;gap:10px;margin-top:16px"><button class="btn btn-primary btn-lg" id="cOff" style="flex:1">${me?'تحديث العرض':'إرسال العرض'}</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button></div>`);
+  const inp=$('#oPrice'), sum=$('#oSum'), btn=$('#cOff');
+  const upd=()=>{const x=+inp.value; const ok=x>=lo&&x<=hi;
+    sum.innerHTML=`<span>إجمالي عرضك</span><span class="tot num">${ok?NF(x*l.kg):'—'} ر.س</span><span>توفيرك مقارنة بسعر الجملة</span><b class="num" style="color:var(--green2)">${ok?NF((hi-x)*l.kg):'—'} ر.س</b><span>CO₂ ستتجنبه إن قُبل</span><b class="num">${NF(l.kg*CO2_PER_KG)} كجم</b>${ok?'':`<span style="color:var(--tomato);grid-column:1/-1">السعر بين ${NF(lo,2)} و ${NF(hi,2)} ر.س/كجم</span>`}`;
+    btn.disabled=!ok;};
+  inp.oninput=upd; document.querySelectorAll('#mbox [data-q]').forEach(q=>q.onclick=()=>{inp.value=(+q.dataset.q).toFixed(2);upd()}); upd();
+  btn.onclick=async()=>{
+    btn.disabled=true; btn.innerHTML='<span class="spin"></span> جارٍ الإرسال…';
+    try{ const done=await Store.offer(id,B,+inp.value); const o=mine(done,B.id);
+      modal(`<div style="text-align:center">${BIG('send','#1d5a3c','#e3efdc')}<h3>${me?'تم تحديث عرضك':'تم إرسال عرضك'}</h3>
+        <p class="muted">${NF(+inp.value,2)} ر.س/كجم على ${esc(crop(l.crop).ar)} (${NF(l.kg)} كجم). يظهر للمزارع باسم "${o?tag(done,o):'مشترٍ'}"، وستصلك رسالة فور قبوله.</p>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:14px"><a class="btn btn-primary" href="#l-${id}" onclick="closeModal()">متابعة العروض</a><button class="btn btn-ghost" onclick="closeModal()">إغلاق</button></div></div>`);
     }catch(e){
-      const msg=e&&e.code==='busy'?'مشترٍ آخر يُتمّ الشراء الآن — حاول بعد ثوانٍ':e&&e.code==='sold'?'سبقك مشترٍ آخر لهذا المزاد':'تعذر إتمام الشراء';
-      closeModal(); toast(msg);
+      closeModal(); toast(e&&e.code==='busy'?'يجري تحديث العرض الآن — حاول بعد ثوانٍ':e&&e.code==='closed'?'انتهت مدة استقبال العروض':e&&e.code==='low'?'السعر أقل من الحد الأدنى':'تعذر إرسال العرض');
     }
   };
 }
@@ -935,8 +1037,8 @@ function openBuy(id){
 function listingDyn(){
   const l=Store.items.get(PARAM);
   if(!l) return Store.mode==='connecting'?`<div class="muted">جارٍ التحميل…</div>`:`<div class="empty">العرض غير موجود. <a href="#market">العودة للسوق</a></div>`;
-  const c=crop(l.crop), s=state(l), B=buyer(), d=km(B,l), G=GRADES[l.grade]||GRADES.cosmetic;
-  return `<a href="#market" class="small muted" style="text-decoration:none">→ العودة للسوق</a>
+  const c=crop(l.crop), s=state(l), B=buyer(), d=km(B,l), G=GRADES[l.grade]||GRADES.cosmetic, farmerView=S.role==='farmer'&&l.farmId===S.farmId;
+  return `<a href="${farmerView?'#farmer':'#market'}" class="small muted" style="text-decoration:none">→ ${farmerView?'العودة لبوابة المزارع':'العودة للسوق'}</a>
   <div class="det" style="margin-top:12px">
     <div>
       <div class="ph">${photoHTML(l)}</div>
@@ -949,42 +1051,30 @@ function listingDyn(){
     </div>
     <div>
       <div class="card pad">
-        <span class="badge ${s==='sold'?'b-sold':s==='live'?'b-live':'b-spoiled'}">${s==='sold'?'مُباع':s==='live'?'● مزاد مباشر':'انتهى المزاد'}</span>
+        ${stBadge(s)}
         <h2 style="font-size:26px;margin:10px 0 4px">${c.e} ${esc(c.ar)} — <span class="num">${NF(l.kg)}</span> كجم</h2>
         <div class="meta muted small">${I('farm')} ${esc(l.farmName)} · ${I('pin')} ${esc(l.city)} · <span class="num">${NF(d)}</span> كم من ${esc(B.city)}</div>
         <hr class="sep">
-        ${s==='live'?`
-          <div class="price"><span class="now num" style="font-size:36px" data-p="${l.id}">${NF(priceAt(l),2)}</span><span>ر.س/كجم</span><span class="was num">${NF(l.market,2)}</span><span class="badge b-cosmetic num" dir="ltr" data-dc="${l.id}"></span></div>
-          <div class="cd" style="margin:8px 0"><span>${I('timer')} ينتهي خلال <b class="num" data-c="${l.id}"></b></span><span>إجمالي الآن: <b class="num" data-t="${l.id}"></b> ر.س</span></div>
-          ${priceChart(l)}
-          <div style="margin-top:14px" data-lk="${l.id}" data-km="${Math.round(d)}">${lockLeft(l,d)?lockHTML(lockLeft(l,d)):`<button class="btn btn-amber btn-lg" style="width:100%" data-buy="${l.id}">${I('bolt')} اشترِ الآن كـ ${esc(B.name)}</button>`}</div>
+        ${s==='open'||s==='review'?`
+          <div class="price"><span class="small">السعر المقترح</span><span class="now num" style="font-size:36px">${NF(sug(l),2)}</span><span>ر.س/كجم</span><span class="was num">${NF(l.market,2)}</span></div>
+          <div class="cd" style="margin:8px 0">${s==='open'?`<span>${I('timer')} تُغلق العروض بعد <b class="num" data-c="${l.id}"></b></span>`:`<span>${I('timer')} انتهت مدة العروض — بانتظار قرار المزارع</span>`}<span>${nOff(pend(l).length)} · الأعلى <b class="num">${best(l)?NF(best(l),2):'—'}</b></span></div>
+          ${s==='open'?`<div class="bar"><i data-b="${l.id}" style="width:0"></i></div>`:''}
+          <h3 style="font-size:16px;margin:16px 0 8px">${farmerView?'العروض الواردة — اختر الأنسب':'العروض الحالية (بأسماء مخفية)'}</h3>
+          ${offerRows(l, farmerView)}
+          ${!farmerView&&s==='open'?`<div style="margin-top:14px">${offerBtn(l,true)}</div>`:''}
         `: s==='sold'?`
-          <dl class="kv"><dt>نوع المشتري</dt><dd>${esc(l.buyerType||'مشترٍ')}</dd><dt>سعر البيع</dt><dd class="num">${NF(l.soldPrice,2)} ر.س/كجم</dd><dt>الإجمالي</dt><dd class="num">${NF(l.total)} ر.س</dd><dt>مدة البيع</dt><dd class="num">${NF((l.soldAt-l.startAt)/60000)} دقيقة</dd><dt>CO₂ متجنب</dt><dd class="num">${NF(l.kg*CO2_PER_KG)} كجم</dd></dl>
+          <dl class="kv"><dt>نوع المشتري</dt><dd>${esc(l.buyerType||'مشترٍ')}</dd><dt>السعر المقبول</dt><dd class="num">${NF(l.soldPrice,2)} ر.س/كجم</dd><dt>الإجمالي</dt><dd class="num">${NF(l.total)} ر.س</dd><dt>عدد العروض</dt><dd class="num">${(l.offers||[]).length||'—'}</dd><dt>CO₂ متجنب</dt><dd class="num">${NF(l.kg*CO2_PER_KG)} كجم</dd></dl>
           <a class="btn btn-primary" style="margin-top:16px" href="#cert-${l.id}">${I('award')} عرض شهادة الاستدامة</a>
-        `:`<p class="muted">انتهى المزاد دون مشترٍ. يمكن للمزارع إعادة طرحه أو توجيهه لبنوك الطعام.</p>`}
+        `:`<p class="muted">انتهت مدة العروض دون عروض. يمكن للمزارع إعادة عرضه أو توجيهه لبنوك الطعام.</p>`}
       </div>
       <div class="card pad" style="margin-top:16px"><dl class="kv">
         <dt>سعر الجملة المرجعي</dt><dd class="num">${NF(l.market,2)} ر.س/كجم</dd>
-        <dt>سعر الافتتاح</dt><dd class="num">${NF(l.start,2)} ر.س/كجم (−40%)</dd>
-        <dt>الحد الأدنى</dt><dd class="num">${NF(l.floor,2)} ر.س/كجم (−60%)</dd>
-        <dt>مدة المزاد</dt><dd class="num">${l.durationMin} دقيقة</dd>
+        <dt>السعر المقترح</dt><dd class="num">${NF(sug(l),2)} ر.س/كجم (−50%)</dd>
+        <dt>الحد الأدنى للعروض</dt><dd class="num">${NF(minP(l),2)} ر.س/كجم (−60%)</dd>
+        <dt>مدة استقبال العروض</dt><dd class="num">${l.durationMin} دقيقة</dd>
         <dt>طُرح</dt><dd>${ago(l.startAt)}</dd></dl></div>
     </div>
   </div>`;
-}
-function priceChart(l){
-  const W=560,H=150,px=36,py=18, x=t=>W-px-(W-2*px)*t, yv=v=>py+(H-2*py)*(1-(v-l.floor*0.8)/(l.market-l.floor*0.8));
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;margin-top:6px" aria-label="مسار انخفاض السعر">
-    <line x1="${px}" x2="${W-px}" y1="${yv(l.market)}" y2="${yv(l.market)}" stroke="#b9ad93" stroke-dasharray="4 4"/>
-    <text x="${px}" y="${yv(l.market)-5}" font-size="11" fill="#7c857c" text-anchor="end">سعر الجملة ${NF(l.market,2)}</text>
-    <path d="M${x(0)} ${yv(l.start)} L${x(1)} ${yv(l.floor)} L${x(1)} ${H-py} L${x(0)} ${H-py}Z" fill="rgba(134,184,90,.18)"/>
-    <line x1="${x(0)}" y1="${yv(l.start)}" x2="${x(1)}" y2="${yv(l.floor)}" stroke="#2b7a52" stroke-width="2.5"/>
-    <text x="${x(0)}" y="${yv(l.start)-8}" font-size="11" fill="#1d5a3c" text-anchor="middle">${NF(l.start,2)}</text>
-    <text x="${x(1)}" y="${yv(l.floor)-8}" font-size="11" fill="#1d5a3c" text-anchor="middle">${NF(l.floor,2)}</text>
-    <circle r="7" fill="#d9932a" stroke="#fff" stroke-width="3" data-dotc="${l.id}" cx="${x(0)}" cy="${yv(l.start)}"/>
-    <text x="${x(0)}" y="${H-3}" font-size="10.5" fill="#7c857c" text-anchor="middle">البداية</text>
-    <text x="${x(1)}" y="${H-3}" font-size="10.5" fill="#7c857c" text-anchor="middle">${l.durationMin} د</text>
-  </svg>`;
 }
 function bindListing(){ bindCards(); }
 
@@ -1012,7 +1102,7 @@ function impactDyn(){
 function certDyn(){
   const l=Store.items.get(PARAM);
   if(!l) return Store.mode==='connecting'?`<div class="muted">جارٍ التحميل…</div>`:`<div class="empty">الشهادة غير موجودة.</div>`;
-  if(l.status!=='sold') return `<div class="empty">لم تكتمل صفقة هذا العرض بعد. <a href="#l-${l.id}">عرض المزاد</a></div>`;
+  if(l.status!=='sold') return `<div class="empty">لم تكتمل صفقة هذا العرض بعد. <a href="#l-${l.id}">عرض المحصول</a></div>`;
   const c=crop(l.crop), co2=l.kg*CO2_PER_KG, save=(l.market-l.soldPrice)*l.kg;
   return `<div style="display:flex;gap:10px;justify-content:center;margin-bottom:18px;flex-wrap:wrap">
       <button class="btn btn-primary" id="dlPdf" ${DL?'':'hidden'}>${I('download')} تحميل PDF</button>
@@ -1097,18 +1187,10 @@ async function downloadCert(l,kind){
 /* ---------- live ticking ---------- */
 function tick(){
   const now=Date.now();
-  document.querySelectorAll('[data-p]').forEach(el=>{const l=Store.items.get(el.dataset.p);if(l)el.textContent=NF(priceAt(l,now),2)});
   document.querySelectorAll('[data-c]').forEach(el=>{const l=Store.items.get(el.dataset.c);if(l)el.textContent=mmss(endAt(l)-now)});
   document.querySelectorAll('[data-b]').forEach(el=>{const l=Store.items.get(el.dataset.b);if(l)el.style.width=(Math.min(1,(now-l.startAt)/(l.durationMin*60000))*100).toFixed(1)+'%'});
-  document.querySelectorAll('[data-dc]').forEach(el=>{const l=Store.items.get(el.dataset.dc);if(l)el.textContent='-'+Math.round((1-priceAt(l,now)/l.market)*100)+'%'});
-  document.querySelectorAll('[data-t]').forEach(el=>{const l=Store.items.get(el.dataset.t);if(l)el.textContent=NF(priceAt(l,now)*l.kg)});
-  document.querySelectorAll('[data-dotc]').forEach(el=>{const l=Store.items.get(el.dataset.dotc);if(!l)return;const f=Math.min(1,(now-l.startAt)/(l.durationMin*60000));
-    const W=560,H=150,px=36,py=18;const v=priceAt(l,now);el.setAttribute('cx',W-px-(W-2*px)*f);el.setAttribute('cy',py+(H-2*py)*(1-(v-l.floor*0.8)/(l.market-l.floor*0.8)))});
-  let needs=false;
-  document.querySelectorAll('[data-lk]').forEach(el=>{const l=Store.items.get(el.dataset.lk);if(!l)return;const left=lockLeft(l,+el.dataset.km,now);
-    const lockedNow=!!el.querySelector('.lock'); if(left&&lockedNow){const b=el.querySelector('.lock b');if(b)b.textContent=mmss(left)} else if(!left&&lockedNow) needs=true;});
-  // an auction that just ended or unlocked → refresh the view once
-  if(needs || [...document.querySelectorAll('[data-c]')].some(el=>{const l=Store.items.get(el.dataset.c);return l&&state(l,now)!=='live'&&l.status!=='sold'&&!el.dataset.ended&&(el.dataset.ended='1')})) renderDyn();
+  // an offer window that just closed → refresh the view once
+  if([...document.querySelectorAll('[data-c]')].some(el=>{const l=Store.items.get(el.dataset.c);return l&&state(l,now)!=='open'&&!el.dataset.ended&&(el.dataset.ended='1')})) renderDyn();
 }
 setInterval(tick,1000);
 
