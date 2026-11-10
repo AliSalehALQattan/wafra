@@ -122,7 +122,10 @@ function plainPrompt(cropKey){
 Grades: "fresh" (no notable defects), "cosmetic" (safe to eat but odd shape, size, colour or light marks), "spoiled" (rot, mold, decay, collapsed or blackened tissue on any visible item).
 Reply with ONLY this JSON: {"grade":"cosmetic","confidence":0.9,"defects_ar":["..."],"note_ar":"..."}`;
 }
-async function dataUrlToBlob(u){ return await (await fetch(u)).blob(); }
+async function dataUrlToBlob(u){ // decode locally: the page's security policy blocks fetch() on data: URLs
+  const i=u.indexOf(','), meta=u.slice(5,i), b64=meta.endsWith(';base64'), mime=meta.split(';')[0]||'image/jpeg';
+  const raw=b64?atob(u.slice(i+1)):decodeURIComponent(u.slice(i+1)); const a=new Uint8Array(raw.length);
+  for(let k=0;k<raw.length;k++) a[k]=raw.charCodeAt(k); return new Blob([a],{type:mime}); }
 const _refBlobCache = {};
 async function refBlobs(cropKey){
   if(_refBlobCache[cropKey]) return _refBlobCache[cropKey];
