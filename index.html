@@ -118,7 +118,7 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:18px 0}
 .step::before{counter-increment:s;content:counter(s);position:absolute;top:16px;left:18px;font-family:"Readex Pro";font-size:40px;font-weight:700;color:var(--bg2)}
 .step h3{font-size:17px;margin:10px 0 6px}
 .step p{margin:0;font-size:14px;color:var(--ink2)}
-.aud{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.aud{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .aud .card{padding:18px}
 .aud h4{font-size:16px;margin:8px 0 4px}
 .aud p{margin:0;font-size:13.5px;color:var(--ink2)}
@@ -242,7 +242,7 @@ footer .row{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;a
 
 @media (max-width:900px){
   .hero,.two,.det,.v2030{grid-template-columns:1fr}
-  .kpis,.steps,.aud{grid-template-columns:1fr 1fr}
+  .kpis,.steps{grid-template-columns:1fr 1fr}.aud{grid-template-columns:1fr}
   .problem{grid-template-columns:1fr}
   .top .row{flex-wrap:wrap;height:auto;padding:10px 0;gap:10px}
   nav.main{order:3;flex:1 1 100%;overflow-x:auto;padding-bottom:2px}
@@ -706,7 +706,6 @@ function homeShell(){
       <div class="card"><div class="aic">${I('sprout')}</div><h4>المزارعون</h4><p>تحويل الخسارة إلى ربح وبيع المحصول خلال ساعة بدل إتلافه.</p></div>
       <div class="card"><div class="aic">${I('factory')}</div><h4>مصانع العصائر والصلصات</h4><p>مواد خام سليمة بخصم يصل إلى 60% من سعر الجملة.</p></div>
       <div class="card"><div class="aic">${I('chef')}</div><h4>المطاعم والمطابخ السحابية</h4><p>خفض تكلفة المكونات مع توثيق أثر بيئي يدعم العلامة التجارية.</p></div>
-      <div class="card"><div class="aic">${I('cart')}</div><h4>المتاجر والسوبرماركت</h4><p>إطلاق ركن "منتجات موفرة" بأسعار منافسة وهوية مستدامة.</p></div>
     </div>
   </section>
 

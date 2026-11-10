@@ -5,7 +5,7 @@
 ## 🔗 [افتح المنصة — Open the live site](https://alisalehalqattan.github.io/wafra/)
 
 
-منصة B2B بالذكاء الاصطناعي تنقذ المحاصيل السليمة المرفوضة شكلياً: يصوّر المزارع محصوله، فيفرّق الذكاء الاصطناعي بين **العيب الشكلي** و**التلف الحقيقي**، ثم يُطرح المحصول في **مزاد تنازلي** لأقرب مصانع العصائر والمطابخ السحابية والمتاجر، وكل صفقة تصدر لها **شهادة استدامة** توثّق الكمية المنقذة و CO₂ المتجنب.
+منصة B2B بالذكاء الاصطناعي تنقذ المحاصيل السليمة المرفوضة شكلياً: يصوّر المزارع محصوله، فيفرّق الذكاء الاصطناعي بين **العيب الشكلي** و**التلف الحقيقي**، ثم يُطرح المحصول في **مزاد تنازلي** لأقرب مصانع العصائر والحلويات والمطابخ السحابية والمطاعم، وكل صفقة تصدر لها **شهادة استدامة** توثّق الكمية المنقذة و CO₂ المتجنب.
 
 مشروع فريق **وفرة** في هاكاثون الأمن الغذائي والاستدامة البيئية.
 
@@ -36,4 +36,4 @@
 
 ---
 
-**Wafra** is an Arabic-first B2B prototype: AI grades produce photos (cosmetic defect vs. real spoilage), safe "ugly" produce is sold in a declining-price auction to the nearest juice factories, cloud kitchens and stores, and every sale issues a sustainability certificate (kg rescued, CO₂e avoided). Built for a food-security & sustainability hackathon.
+**Wafra** is an Arabic-first B2B prototype: AI grades produce photos (cosmetic defect vs. real spoilage), safe "ugly" produce is sold in a declining-price auction to the nearest juice factories, sweets factories, cloud kitchens and restaurants, and every sale issues a sustainability certificate (kg rescued, CO₂e avoided). Built for a food-security & sustainability hackathon.
