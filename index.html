@@ -158,6 +158,10 @@ section.block{margin-top:46px}
 .refcmp{margin-top:12px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .refrow{display:flex;align-items:center;gap:6px;margin-top:4px}.refrow span{width:38px;color:var(--green2);font-weight:600}.refrow.bad span{color:var(--tomato)}
 .refrow img{width:44px;height:44px;object-fit:cover;border-radius:8px;border:2px solid var(--mint)}.refrow.bad img{border-color:var(--tomatobg)}
+.tb{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;vertical-align:middle}
+.tb svg{width:13px;height:13px}.tb-t{background:#e3efdc;color:#1d5a3c;border:1px solid #b9d7a8}.tb-n{background:#f3ece0;color:#6b5a3a;border:1px solid #e2d8c3}
+.trust{display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+.trust .pb{flex:1;min-width:140px;height:8px;background:#eadfca;border-radius:99px;overflow:hidden}.trust .pb i{display:block;height:100%;background:var(--green2)}
 .samples span{font-size:11.5px;color:var(--ink2)}
 .scan{position:relative;border-radius:var(--r);overflow:hidden;background:#000;aspect-ratio:4/3}
 .scan img{width:100%;height:100%;object-fit:cover;display:block}
@@ -350,11 +354,13 @@ const cropScene = k => { const a=CROP_ART[k]||CROP_ART.other, bg=SCENE_BG[k]||'#
   return `<svg class="scene" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="400" height="300" fill="${bg}"/><g stroke="#000" stroke-opacity=".05" stroke-width="2"><path d="M0 75h400M0 150h400M0 225h400"/></g><ellipse cx="200" cy="262" rx="170" ry="14" fill="#000" opacity=".06"/><g transform="translate(40 85) scale(2.5) rotate(-10 32 32)">${a}</g><g transform="translate(225 40) scale(1.85) rotate(14 32 32)">${a}</g><g transform="translate(245 150) scale(1.45) rotate(-22 32 32)">${a}</g></svg>`; };
 for (const k in PRICES) PRICES[k].e = cropIc(k);
 const FARMS = [
-  {id:'f1',name:'مزرعة أبو أحمد',city:'الأحساء',lat:25.43,lng:49.62},
-  {id:'f2',name:'مزارع القصيم الخضراء',city:'بريدة',lat:26.36,lng:43.98},
-  {id:'f3',name:'مزرعة الخرج النموذجية',city:'الخرج',lat:24.16,lng:47.33},
-  {id:'f4',name:'مزرعة وادي فاطمة',city:'الجموم',lat:21.62,lng:39.70},
+  {id:'f1',name:'مزرعة أبو أحمد',city:'الأحساء',lat:25.43,lng:49.62,past:9},     // sales completed before this demo's history
+  {id:'f2',name:'مزارع القصيم الخضراء',city:'بريدة',lat:26.36,lng:43.98,past:2},
+  {id:'f3',name:'مزرعة الخرج النموذجية',city:'الخرج',lat:24.16,lng:47.33,past:7},
+  {id:'f4',name:'مزرعة وادي فاطمة',city:'الجموم',lat:21.62,lng:39.70,past:1},
 ];
+/* ---------- seller trust badges: earned by completed sales; trusted sellers pay a lower listing fee ---------- */
+const TRUST_AT=10, FEE_NEW=0.20, FEE_TRUSTED=0.15;
 const BUYERS = [
   {id:'b1',name:'مصنع الواحة للعصائر',type:'factory',typeAr:'مصنع عصائر وصلصات',city:'الهفوف',lat:25.38,lng:49.59},
   {id:'b2',name:'مطبخ السحاب المركزي',type:'kitchen',typeAr:'مطبخ سحابي',city:'الدمام',lat:26.42,lng:50.09},
@@ -445,6 +451,10 @@ function pickSamples(){
 }
 pickSamples();
 /* ---------- helpers ---------- */
+function farmSales(fid){ const f=FARMS.find(x=>x.id===fid); return (f&&f.past||0)+Store.list().filter(l=>l.farmId===fid&&l.status==='sold').length; }
+function badgeOf(fid){ const n=farmSales(fid), t=n>=TRUST_AT; return {n, trusted:t, fee:t?FEE_TRUSTED:FEE_NEW, label:t?'بائع موثوق':'بائع جديد', left:Math.max(0,TRUST_AT-n)}; }
+function badgeHTML(fid){ const b=badgeOf(fid); return `<span class="tb ${b.trusted?'tb-t':'tb-n'}" title="${b.n} صفقة مكتملة">${I(b.trusted?'award':'sprout')} ${b.label}</span>`; }
+const netOf=l=>(+l.total||0)*(1-(l.fee!=null?l.fee:FEE_NEW));
 const $ = (s, r=document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const NF = (n, d=0) => Number(n||0).toLocaleString('en-US',{maximumFractionDigits:d,minimumFractionDigits:d});
@@ -539,7 +549,7 @@ const Store = {
   async buy(id, buyer, price){
     const now=Date.now();
     const sale=(l)=>{const p=Math.max(l.floor,Math.min(l.start,price));return {status:'sold',buyerId:buyer.id,buyerName:buyer.name,buyerType:buyer.typeAr,
-      soldAt:now,soldPrice:p,total:+(p*l.kg).toFixed(2)}};
+      soldAt:now,soldPrice:p,total:+(p*l.kg).toFixed(2),fee:badgeOf(l.farmId).fee}};
     if(this.mode==='live'){
       const ref=this.db.collection('listings').doc(id);
       let lease; try{lease=await ref.acquire({holder:CLIENT,ttlMs:8000})}catch(e){lease={acquired:true}}
@@ -672,7 +682,10 @@ function route(){
 }
 window.addEventListener('hashchange',route);
 
-function onData(){ renderSync(); renderDyn(); renderTools(); }
+const _trustSeen={};
+function onData(){ renderSync(); renderDyn(); renderTools();
+  if(Store.mode==='connecting') return;
+  FARMS.forEach(f=>{ const t=badgeOf(f.id).trusted; if(_trustSeen[f.id]===false&&t&&VIEW==='farmer'&&f.id===S.farmId) toast('مبروك! أصبحت مزرعتك "بائع موثوق" — رسوم المنصة الآن 15%'); _trustSeen[f.id]=t; }); }
 
 function renderSync(){
   const el=$('#sync'); const m=Store.mode;
@@ -866,7 +879,7 @@ function renderWork(){
       </div>
       <div class="calc">
         <div><b class="num">${NF(st,2)} ← ${NF(fl,2)}</b><span>سعر المزاد ر.س/كجم</span></div>
-        <div><b class="num">${kg?NF(kg*(st+fl)/2):'—'}</b><span>دخل متوقع (ر.س)</span></div>
+        <div><b class="num">${kg?NF(kg*(st+fl)/2*(1-badgeOf(S.farmId).fee)):'—'}</b><span>صافي متوقع بعد رسوم ${Math.round(badgeOf(S.farmId).fee*100)}% (ر.س)</span></div>
         <div><b class="num">${kg?NF(kg*CO2_PER_KG):'—'}</b><span>كجم CO₂ ستُتجنب</span></div>
       </div>
       <div class="src-note">السعر يبدأ بخصم 40% وينخفض تدريجياً حتى 60% · أول ${PRIORITY_MIN} دقائق أولوية للمشترين ضمن ${PRIORITY_KM} كم.</div>
@@ -916,10 +929,12 @@ function farmerDyn(){
   const mine=Store.list().filter(l=>l.farmId===S.farmId).sort((a,b)=>b.startAt-a.startAt);
   if(Store.mode==='connecting') return `<div class="muted small">جارٍ التحميل…</div>`;
   if(!mine.length) return `<div class="empty">لا توجد عروض بعد لهذه المزرعة.<br>ابدأ بتصوير محصولك.</div>`;
-  const earned=mine.filter(l=>l.status==='sold').reduce((a,l)=>a+(+l.total||0),0);
-  return `<div class="small" style="margin-bottom:10px">إجمالي الدخل من المحاصيل المنقذة: <b class="num" style="color:var(--green)">${NF(earned)} ر.س</b></div>
+  const earned=mine.filter(l=>l.status==='sold').reduce((a,l)=>a+netOf(l),0), b=badgeOf(S.farmId);
+  return `<div class="trust">${badgeHTML(S.farmId)}<div class="small"><b class="num">${b.n}</b> صفقة مكتملة · رسوم المنصة <b class="num">${Math.round(b.fee*100)}%</b></div>
+    ${b.trusted?`<div class="small" style="color:var(--green2)">${I('check')} موثوق لدى المشترين — رسومك مخفّضة</div>`:`<div class="pb" title="${b.n} / ${TRUST_AT}"><i style="width:${Math.min(100,100*b.n/TRUST_AT)}%"></i></div><div class="small muted">باقي <b class="num">${b.left}</b> ${b.left===1?'صفقة':'صفقات'} لشارة "بائع موثوق" ورسوم 15%</div>`}</div>
+  <div class="small" style="margin-bottom:10px">صافي دخلك من المحاصيل المنقذة (بعد رسوم المنصة): <b class="num" style="color:var(--green)">${NF(earned)} ر.س</b></div>
   <div class="mine">${mine.slice(0,12).map(l=>{const s=state(l);return `<a class="mi" href="#l-${l.id}">${photoHTML(l)}<div class="x"><b>${crop(l.crop).e} ${esc(crop(l.crop).ar)} · <span class="num">${NF(l.kg)}</span> كجم</b>
-    <div class="small muted">${s==='sold'?`بيع لـ${esc(l.buyerType||'مشترٍ')} بـ <span class="num">${NF(l.total)}</span> ر.س`:s==='live'?`السعر الآن <span class="num" data-p="${l.id}">${NF(priceAt(l),2)}</span> ر.س/كجم · متبقٍ <span class="num" data-c="${l.id}"></span>`:'انتهى المزاد دون بيع'}</div></div>
+    <div class="small muted">${s==='sold'?`بيع لـ${esc(l.buyerType||'مشترٍ')} بـ <span class="num">${NF(l.total)}</span> ر.س · صافيك <span class="num">${NF(netOf(l))}</span>`:s==='live'?`السعر الآن <span class="num" data-p="${l.id}">${NF(priceAt(l),2)}</span> ر.س/كجم · متبقٍ <span class="num" data-c="${l.id}"></span>`:'انتهى المزاد دون بيع'}</div></div>
     <span class="badge ${s==='sold'?'b-sold':s==='live'?'b-live':'b-spoiled'}">${s==='sold'?'مُباع ✓':s==='live'?'مباشر':'منتهٍ'}</span></a>`}).join('')}</div>`;
 }
 
@@ -963,7 +978,7 @@ function card(l,d,B){
     <a class="ph" href="#l-${l.id}">${photoHTML(l)}<div class="tl"><span class="badge b-cosmetic">${I('check')} ${GRADES[l.grade]?.short||'عيب شكلي'} · ${Math.round((l.confidence||0)*100)}%</span></div><div class="disc num" dir="ltr" data-dc="${l.id}">-${disc}%</div></a>
     <div class="bd">
       <a href="#l-${l.id}" style="text-decoration:none"><h3>${c.e} ${esc(c.ar)} · <span class="num">${NF(l.kg)}</span> كجم</h3></a>
-      <div class="meta"><span>${I('farm')} ${esc(l.farmName)}</span><span>${I('pin')} ${esc(l.city)} · <span class="num">${NF(d)}</span> كم</span></div>
+      <div class="meta"><span>${I('farm')} ${esc(l.farmName)} ${badgeHTML(l.farmId)}</span><span>${I('pin')} ${esc(l.city)} · <span class="num">${NF(d)}</span> كم</span></div>
       <div class="chips" style="margin:0">${(l.defects||[]).slice(0,2).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}</div>
       <div class="price"><span class="now num" data-p="${l.id}">${NF(p,2)}</span><span class="small">ر.س/كجم</span><span class="was num">${NF(l.market,2)}</span></div>
       <div class="bar"><i data-b="${l.id}" style="width:0"></i></div>
@@ -976,9 +991,9 @@ function bindCards(){ document.querySelectorAll('[data-buy]').forEach(b=>b.oncli
 
 function openBuy(id){
   const l=Store.items.get(id); if(!l||state(l)!=='live'){toast('هذا المزاد لم يعد متاحاً');return}
-  const B=buyer(), p=priceAt(l), tot=p*l.kg, save=(l.market-p)*l.kg;
+  const B=buyer(), p=priceAt(l), tot=p*l.kg, save=(l.market-p)*l.kg, wasN=badgeOf(l.farmId).n;
   modal(`<h3>تأكيد الشراء</h3>
-    <div style="display:flex;gap:12px;align-items:center"><div style="width:70px;height:56px;border-radius:10px;overflow:hidden;flex:none">${photoHTML(l)}</div><div><b>${crop(l.crop).e} ${esc(crop(l.crop).ar)} — ${NF(l.kg)} كجم</b><div class="small muted">${esc(l.farmName)} · ${esc(l.city)}</div></div></div>
+    <div style="display:flex;gap:12px;align-items:center"><div style="width:70px;height:56px;border-radius:10px;overflow:hidden;flex:none">${photoHTML(l)}</div><div><b>${crop(l.crop).e} ${esc(crop(l.crop).ar)} — ${NF(l.kg)} كجم</b><div class="small muted">${esc(l.farmName)} ${badgeHTML(l.farmId)} · ${esc(l.city)}</div></div></div>
     <div class="sum">
       <span>المشتري</span><b>${esc(B.name)}</b>
       <span>السعر المثبت الآن</span><b class="num">${NF(p,2)} ر.س/كجم</b>
@@ -992,7 +1007,7 @@ function openBuy(id){
     const b=$('#cBuy'); b.disabled=true; b.innerHTML='<span class="spin"></span> جارٍ التأكيد…';
     try{ const done=await Store.buy(id,B,p);
       modal(`<div style="text-align:center">${BIG('sprout','#1d5a3c','#e3efdc')}<h3>تمت الصفقة بنجاح!</h3>
-        <p class="muted">أنقذتَ <b class="num">${NF(done.kg)}</b> كجم من الهدر وتجنبتَ <b class="num">${NF(done.kg*CO2_PER_KG)}</b> كجم من CO₂.</p>
+        <p class="muted">أنقذتَ <b class="num">${NF(done.kg)}</b> كجم من الهدر وتجنبتَ <b class="num">${NF(done.kg*CO2_PER_KG)}</b> كجم من CO₂.</p>${wasN+1===TRUST_AT?`<div class="trust" style="justify-content:center">${I('award')} <b>${esc(l.farmName)}</b> أكملت ${TRUST_AT} صفقات وأصبحت <span class="tb tb-t">${I('award')} بائع موثوق</span></div>`:''}
         <div style="display:flex;gap:10px;justify-content:center;margin-top:14px"><a class="btn btn-primary" href="#impact" onclick="closeModal()">${I('globe')} عرض لوحة الأثر</a><button class="btn btn-ghost" onclick="closeModal()">إغلاق</button></div></div>`);
     }catch(e){
       const msg=e&&e.code==='busy'?'مشترٍ آخر يُتمّ الشراء الآن — حاول بعد ثوانٍ':e&&e.code==='sold'?'سبقك مشترٍ آخر لهذا المزاد':'تعذر إتمام الشراء';
@@ -1021,7 +1036,7 @@ function listingDyn(){
       <div class="card pad">
         <span class="badge ${s==='sold'?'b-sold':s==='live'?'b-live':'b-spoiled'}">${s==='sold'?'مُباع':s==='live'?'● مزاد مباشر':'انتهى المزاد'}</span>
         <h2 style="font-size:26px;margin:10px 0 4px">${c.e} ${esc(c.ar)} — <span class="num">${NF(l.kg)}</span> كجم</h2>
-        <div class="meta muted small">${I('farm')} ${esc(l.farmName)} · ${I('pin')} ${esc(l.city)} · <span class="num">${NF(d)}</span> كم من ${esc(B.city)}</div>
+        <div class="meta muted small">${I('farm')} ${esc(l.farmName)} ${badgeHTML(l.farmId)} · ${I('pin')} ${esc(l.city)} · <span class="num">${NF(d)}</span> كم من ${esc(B.city)}</div>
         <hr class="sep">
         ${s==='live'?`
           <div class="price"><span class="now num" style="font-size:36px" data-p="${l.id}">${NF(priceAt(l),2)}</span><span>ر.س/كجم</span><span class="was num">${NF(l.market,2)}</span><span class="badge b-cosmetic num" dir="ltr" data-dc="${l.id}"></span></div>
