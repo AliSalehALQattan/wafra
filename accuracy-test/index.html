@@ -153,7 +153,7 @@ $('#tiles').innerHTML=TEST.map((t,i)=>`<div class="tile" id="t${i}" title="${CRO
 
 let SAMPLE=null, DB=null, RUN=null, STOP=false;
 (async()=>{
-  try{ SAMPLE=await claude.use('sample'); if(SAMPLE){ const l=await SAMPLE.limits(); if(!(l&&l.images)){ SAMPLE=null; } } }catch(e){ SAMPLE=null }
+  try{ SAMPLE=await claude.use('sample'); if(SAMPLE){ const l=await SAMPLE.limits(); window.__LIM=l; if(!(l&&l.images)){ SAMPLE=null; } } }catch(e){ SAMPLE=null }
   try{ DB=await claude.use('db'); }catch(e){}
   $('#aiNote').textContent=SAMPLE?'محرك الرؤية متصل. يستغرق الاختبار الكامل عدة دقائق.':'محرك الرؤية غير متاح في هذا العرض — افتح الصفحة من رابط Claude وسجّل الدخول.';
   if(!SAMPLE){ $('#runRef').disabled=true; $('#runPlain').disabled=true; }
@@ -188,7 +188,7 @@ function log(s){ const d=document.createElement('div'); d.textContent=s; $('#log
 
 async function run(mode){
   STOP=false; $('#runRef').disabled=$('#runPlain').disabled=true; $('#stop').disabled=false;
-  RUN={id:'run-'+Date.now(), mode, at:Date.now(), done:false, results:new Array(TEST.length).fill(null)};
+  RUN={id:'run-'+Date.now(), mode, at:Date.now(), done:false, limits:JSON.parse(JSON.stringify(window.__LIM||null)), errors:[], results:new Array(TEST.length).fill(null)};
   document.querySelectorAll('.tile').forEach(t=>{t.className='tile';t.querySelector('i').textContent=''});
   const order=TEST.map((_,i)=>i); let next=0, done=0, fails=0;
   async function worker(){
@@ -196,7 +196,7 @@ async function run(mode){
       let r=null;
       for(let a=0;a<3&&!r&&!STOP;a++){
         try{ const blob=await dataUrlToBlob(t.img); r=await gradeWithRefs(SAMPLE, blob, t.crop, mode==='refs'); }
-        catch(e){ if(e&&e.code==='rate_limited'){ $('#status').textContent='حد الطلبات — انتظار…'; await new Promise(s=>setTimeout(s,15000)); } else if(e&&e.code==='not_granted'){ STOP=true; log('لم يُمنح الإذن لمحرك الرؤية'); } else { await new Promise(s=>setTimeout(s,1500)); if(a===2) log('فشل: '+t.file+' '+(e&&e.message||e)); } }
+        catch(e){ if(RUN.errors.length<15) RUN.errors.push({file:t.file,code:String(e&&e.code||''),msg:String(e&&e.message||e).slice(0,300)}); if(RUN.errors.length===3) saveRun(); if(e&&e.code==='rate_limited'){ $('#status').textContent='حد الطلبات — انتظار…'; await new Promise(s=>setTimeout(s,15000)); } else if(e&&e.code==='not_granted'){ STOP=true; log('لم يُمنح الإذن لمحرك الرؤية'); } else { await new Promise(s=>setTimeout(s,1500)); if(a===2) log('فشل: '+t.file+' '+(e&&e.message||e)); } }
       }
       if(r){ RUN.results[i]={i,grade:r.grade,closer:r.closer,conf:r.confidence,note:r.note}; } else { fails++; $('#t'+i).className='tile'; }
       done++; $('#prog').style.width=(100*done/order.length)+'%'; $('#status').textContent=`${done} / ${order.length}`+(fails?` · ${fails} تعذّر`:''); render();
