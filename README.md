@@ -39,11 +39,12 @@
 
 **Wafra** is an Arabic-first B2B prototype: AI grades produce photos (cosmetic defect vs. real spoilage), visually acceptable "ugly" produce (Class II) is sold in a declining-price auction to the nearest juice and sauce factories, cloud kitchens and restaurants, and every sale is counted on an impact dashboard (kg rescued, CO₂e avoided). Built for a food-security & sustainability hackathon.
 
-## شارات الثقة للبائعين
+## نموذج العمل
 
-| الشارة | الشرط | رسوم الإدراج |
-|---|---|---|
-| بائع جديد | أقل من 10 صفقات مكتملة | 20% من قيمة الصفقة |
-| بائع موثوق | 10 صفقات مكتملة أو أكثر | 15% |
+| المصدر | النسبة |
+|---|---|
+| عمولة على المزارع (بائع جديد، أقل من 10 صفقات) | 10% من قيمة المحصول المباع |
+| عمولة على المزارع (بائع موثوق، 10 صفقات أو أكثر) | 7% |
+| رسوم شراء على المشتري | 1% لكل صفقة ناجحة |
 
 تظهر الشارة بجانب اسم المزرعة في السوق وصفحة العرض وبوابة المزارع، وتُحسب تلقائياً من الصفقات الفعلية.

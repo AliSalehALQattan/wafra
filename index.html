@@ -364,7 +364,7 @@ const FARMS = [
   {id:'f4',name:'مزرعة وادي فاطمة',city:'الجموم',lat:21.62,lng:39.70,past:1},
 ];
 /* ---------- seller trust badges: earned by completed sales; trusted sellers pay a lower listing fee ---------- */
-const TRUST_AT=10, FEE_NEW=0.20, FEE_TRUSTED=0.15;
+const TRUST_AT=10, FEE_NEW=0.10, FEE_TRUSTED=0.07, BUYER_FEE=0.01;
 const BUYERS = [
   {id:'b1',name:'مصنع الواحة للعصائر',type:'factory',typeAr:'مصنع عصائر وصلصات',city:'الهفوف',lat:25.38,lng:49.59},
   {id:'b2',name:'مطبخ السحاب المركزي',type:'kitchen',typeAr:'مطبخ سحابي',city:'الدمام',lat:26.42,lng:50.09},
@@ -689,7 +689,7 @@ window.addEventListener('hashchange',route);
 const _trustSeen={};
 function onData(){ renderSync(); renderDyn(); renderTools();
   if(Store.mode==='connecting') return;
-  FARMS.forEach(f=>{ const t=badgeOf(f.id).trusted; if(_trustSeen[f.id]===false&&t&&VIEW==='farmer'&&f.id===S.farmId) toast('مبروك! أصبحت مزرعتك "بائع موثوق" — رسوم المنصة الآن 15%'); _trustSeen[f.id]=t; }); }
+  FARMS.forEach(f=>{ const t=badgeOf(f.id).trusted; if(_trustSeen[f.id]===false&&t&&VIEW==='farmer'&&f.id===S.farmId) toast('مبروك! أصبحت مزرعتك "بائع موثوق" — عمولة المنصة الآن '+Math.round(FEE_TRUSTED*100)+'%'); _trustSeen[f.id]=t; }); }
 
 function renderSync(){
   const el=$('#sync'); const m=Store.mode;
@@ -885,7 +885,7 @@ function renderWork(){
       </div>
       <div class="calc">
         <div><b class="num">${NF(st,2)} ← ${NF(fl,2)}</b><span>سعر المزاد ر.س/كجم</span></div>
-        <div><b class="num">${kg?NF(kg*(st+fl)/2*(1-badgeOf(S.farmId).fee)):'—'}</b><span>صافي متوقع بعد رسوم ${Math.round(badgeOf(S.farmId).fee*100)}% (ر.س)</span></div>
+        <div><b class="num">${kg?NF(kg*(st+fl)/2*(1-badgeOf(S.farmId).fee)):'—'}</b><span>صافي متوقع بعد عمولة ${Math.round(badgeOf(S.farmId).fee*100)}% (ر.س)</span></div>
         <div><b class="num">${kg?NF(kg*co2f(d.crop)):'—'}</b><span>كجم CO₂ ستُتجنب</span></div>
       </div>
       <div class="src-note">السعر يبدأ بخصم 40٪ وينخفض حتى الحد الأدنى الذي تختاره (أقصى خصم 60٪) · حد أدنى للشحنة 500 كجم، استلام من المزرعة أو شاحنة مبردة · أول ${PRIORITY_MIN} دقائق أولوية للمشترين ضمن ${PRIORITY_KM} كم.</div>
@@ -937,8 +937,8 @@ function farmerDyn(){
   if(Store.mode==='connecting') return `<div class="muted small">جارٍ التحميل…</div>`;
   if(!mine.length) return `<div class="empty">لا توجد عروض بعد لهذه المزرعة.<br>ابدأ بتصوير محصولك.</div>`;
   const earned=mine.filter(l=>l.status==='sold').reduce((a,l)=>a+netOf(l),0), b=badgeOf(S.farmId);
-  return `<div class="trust">${badgeHTML(S.farmId)}<div class="small"><b class="num">${b.n}</b> صفقة مكتملة · رسوم المنصة <b class="num">${Math.round(b.fee*100)}%</b></div>
-    ${b.trusted?`<div class="small" style="color:var(--green2)">${I('check')} موثوق لدى المشترين — رسومك مخفّضة</div>`:`<div class="pb" title="${b.n} / ${TRUST_AT}"><i style="width:${Math.min(100,100*b.n/TRUST_AT)}%"></i></div><div class="small muted">باقي <b class="num">${b.left}</b> ${b.left===1?'صفقة':'صفقات'} لشارة "بائع موثوق" ورسوم 15%</div>`}</div>
+  return `<div class="trust">${badgeHTML(S.farmId)}<div class="small"><b class="num">${b.n}</b> صفقة مكتملة · عمولة المنصة <b class="num">${Math.round(b.fee*100)}%</b></div>
+    ${b.trusted?`<div class="small" style="color:var(--green2)">${I('check')} موثوق لدى المشترين — عمولتك مخفّضة</div>`:`<div class="pb" title="${b.n} / ${TRUST_AT}"><i style="width:${Math.min(100,100*b.n/TRUST_AT)}%"></i></div><div class="small muted">باقي <b class="num">${b.left}</b> ${b.left===1?'صفقة':'صفقات'} لشارة "بائع موثوق" وعمولة ${Math.round(FEE_TRUSTED*100)}%</div>`}</div>
   <div class="small" style="margin-bottom:10px">صافي دخلك من المحاصيل المنقذة (بعد رسوم المنصة): <b class="num" style="color:var(--green)">${NF(earned)} ر.س</b></div>
   <div class="mine">${mine.slice(0,12).map(l=>{const s=state(l);return `<a class="mi" href="#l-${l.id}">${photoHTML(l)}<div class="x"><b>${crop(l.crop).e} ${esc(crop(l.crop).ar)} · <span class="num">${NF(l.kg)}</span> كجم</b>
     <div class="small muted">${s==='sold'?`بيع لـ${esc(l.buyerType||'مشترٍ')} بـ <span class="num">${NF(l.total)}</span> ر.س · صافيك <span class="num">${NF(netOf(l))}</span>`:s==='live'?`السعر الآن <span class="num" data-p="${l.id}">${NF(priceAt(l),2)}</span> ر.س/كجم · متبقٍ <span class="num" data-c="${l.id}"></span>`:'انتهى المزاد دون بيع'}</div></div>
@@ -1006,7 +1006,8 @@ function openBuy(id){
       <span>السعر المثبت الآن</span><b class="num">${NF(p,2)} ر.س/كجم</b>
       <span>توفيرك مقارنة بسعر الجملة</span><b class="num" style="color:var(--green2)">${NF(save)} ر.س</b>
       <span>CO₂ ستتجنبه</span><b class="num">${NF(l.kg*co2f(l.crop))} كجم</b>
-      <span style="font-weight:600">الإجمالي</span><span class="tot num">${NF(tot)} ر.س</span>
+      <span>رسوم الشراء (${Math.round(BUYER_FEE*100)}%)</span><b class="num">${NF(tot*BUYER_FEE,2)} ر.س</b>
+       <span style="font-weight:600">الإجمالي</span><span class="tot num">${NF(tot*(1+BUYER_FEE))} ر.س</span>
     </div>
     <div class="small muted">يُثبَّت السعر لحظة الضغط على "تأكيد". الدفع والاستلام يتمّان عبر الشريك اللوجستي (خارج نطاق النموذج الأولي).</div>
     <div style="display:flex;gap:10px;margin-top:16px"><button class="btn btn-primary btn-lg" id="cBuy" style="flex:1">تأكيد الشراء</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button></div>`);
