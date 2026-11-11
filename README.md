@@ -24,17 +24,20 @@
 - خطوط Readex Pro و IBM Plex Sans Arabic، وأيقونات ورسومات SVG مرسومة داخل الكود
 - في النسخة المباشرة: قاعدة بيانات لحظية مشتركة ونموذج رؤية حاسوبية للفحص
 - في هذه النسخة (GitHub Pages): وضع عرض محلي — البيانات على جهاز الزائر، والفحص بتحليل ألوان مبسّط
-- النسخة الإنتاجية المخططة: نموذج YOLOv8 مدرّب على صور محاصيل سعودية
+- النسخة الإنتاجية المخططة: نموذج تصنيف (EfficientNet) مدرّب على صور محاصيل سعودية مصنّفة وفق الدرجة الثانية (Class II)
 
 ## المنهجية والمصادر
 
-- الانبعاثات المتجنبة = الكمية × عوامل انبعاث لكل محصول (Poore & Nemecek 2018) CO₂e/كجم (مشتق من FAO 2013: ≈3.3 مليار طن CO₂e ÷ ≈1.3 مليار طن غذاء مهدر)
-- أكثر من 33% فقد وهدر غذائي، وتكلفة 40 مليار ريال سنوياً — [وزارة البيئة والمياه والزراعة](https://mewa.gov.sa/en/MediaCenter/News/Pages/News242020.aspx)
+- الانبعاثات المتجنبة = الكمية × عامل انبعاث لكل محصول (Poore & Nemecek, Science 2018): الطماطم 2.1، الموز 0.9، البطاطس 0.5، الجزر والحمضيات والتفاح 0.4، وعامل متحفظ 1.0 لبقية المحاصيل (كجم CO₂e/كجم)
+- 27.9% من الغذاء يُفقد أو يُهدر (الهيئة العامة للأمن الغذائي، 2025) — [Argaam](https://www.argaam.com/en/article/articledetail/id/1846487)
+- نحو 40 مليار ريال قيمة الفقد والهدر (المسح الوطني لخط الأساس، المؤسسة العامة للحبوب) — [Arab News](https://www.arabnews.com/node/1654461)
+- نحو مليون طن خضراوات تُفقد أو تُهدر سنوياً، منها 234 ألف طن طماطم — [وزارة البيئة والمياه والزراعة](https://www.mewa.gov.sa/ar/MediaCenter/News/Pages/News8692020.aspx)
+- الفحص بصري ومساعد: يصنّف إلى طازج / عيب شكلي مقبول بصرياً (درجة ثانية) / تالف، ولا يغني عن فحص المشتري عند الاستلام
 - أسعار الجملة في النموذج الأولي استرشادية، والمزارع والمشترون بأسماء وهمية
 
 ---
 
-**Wafra** is an Arabic-first B2B prototype: AI grades produce photos (cosmetic defect vs. real spoilage), safe "ugly" produce is sold in a declining-price auction to the nearest juice factories, sweets factories, cloud kitchens and restaurants, and every sale is counted on an impact dashboard (kg rescued, CO₂e avoided). Built for a food-security & sustainability hackathon.
+**Wafra** is an Arabic-first B2B prototype: AI grades produce photos (cosmetic defect vs. real spoilage), visually acceptable "ugly" produce (Class II) is sold in a declining-price auction to the nearest juice and sauce factories, cloud kitchens and restaurants, and every sale is counted on an impact dashboard (kg rescued, CO₂e avoided). Built for a food-security & sustainability hackathon.
 
 ## شارات الثقة للبائعين
 
